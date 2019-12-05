@@ -1,12 +1,13 @@
 #! /usr/bin/python3
-
+import os
 import tensorflow as tf
+#import logging
+#logging.getLogger('tensorflow').disabled = True
 import csv
 import argparse
 import resnet
 import Vgg10
 from tqdm import tqdm
-import os
 import quantization as q
 import math
 import sys
@@ -41,13 +42,13 @@ Classes:
 
 def parse_example( ex, use_teacher = False ):
     ftrs = {
-        "signal" : tf.FixedLenFeature( shape = [2048 ], dtype = tf.float32 ),
-        "label" : tf.FixedLenFeature( shape = [ 1 ], dtype = tf.string ),
-        "snr" : tf.FixedLenFeature( shape = [ 1 ], dtype = tf.int64 )
+        "signal" : tf.io.FixedLenFeature( shape = [2048 ], dtype = tf.float32 ),
+        "label" : tf.io.FixedLenFeature( shape = [ 1 ], dtype = tf.string ),
+        "snr" : tf.io.FixedLenFeature( shape = [ 1 ], dtype = tf.int64 )
     }
     if use_teacher:
         ftrs["teacher"] = tf.FixedLenFeature( shape = [24], dtype = tf.float32 )
-    parsed_ex = tf.parse_single_example( ex, ftrs )
+    parsed_ex = tf.io.parse_single_example( ex, ftrs )
     signal = tf.transpose( tf.reshape( parsed_ex["signal"], ( 2, 1024 ) ) )
     label_char = tf.substr( parsed_ex["label"], 0, 1 )
     label = tf.decode_raw( label_char, out_type=tf.uint8)
@@ -102,9 +103,9 @@ def get_optimizer( pred, label, learning_rate, resnet_pred = None ):
         )
         teacher_err = tf.reduce_sum( teacher_err )
         tf.summary.scalar( "teacher_err", teacher_err )
-    lr = tf.train.exponential_decay(
+    lr = tf.compat.v1.train.exponential_decay(
         learning_rate,
-        tf.train.get_or_create_global_step(),
+        tf.compat.v1.train.get_or_create_global_step(),
         100000,
         0.5
     )
@@ -112,13 +113,13 @@ def get_optimizer( pred, label, learning_rate, resnet_pred = None ):
     pred = tf.math.argmax( pred, axis = 1 )
     correct = tf.cast( tf.math.equal( pred, tf.cast( label, tf.int64 ) ), tf.float32 )
     accr = tf.reduce_mean( correct )
-    tf.summary.histogram( "preds", pred )
+    tf.compat.v1.summary.histogram( "preds", pred )
     tf.summary.scalar( "learning_rate", tf.reduce_sum( lr ) )
     tf.summary.scalar( "accuracy", accr )
-    update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-    opt = tf.train.AdamOptimizer( lr )
+    update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
+    opt = tf.compat.v1.train.AdamOptimizer( lr )
     with tf.control_dependencies(update_ops):
-        return opt.minimize( err, global_step = tf.train.get_or_create_global_step() )
+        return opt.minimize( err, global_step = tf.compat.v1.train.get_or_create_global_step() )
 
 def test_loop( snr, pred, label, training, fname, no_loops ):
     pred = tf.math.argmax( pred, axis = 1 )
@@ -139,23 +140,23 @@ def test_loop( snr, pred, label, training, fname, no_loops ):
     f_out.close()
 
 def train_loop( opt, summary_writer, num_correct, training, no_test_batches, batch_size, no_steps = 100000, do_val = True ):
-    summaries = tf.summary.merge_all()
-    curr_step = tf.train.get_global_step()
+    summaries = tf.compat.v1.summary.merge_all()
+    curr_step = tf.compat.v1.train.get_global_step()
     step = sess.run( curr_step )
-    tf.logging.log( tf.logging.INFO, "Starting train loop at step " + str(step) )
+    tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Starting train loop at step " + str(step) )
     try:
         for i in range( step, no_steps ):
             step, _, smry = sess.run( [ curr_step, opt, summaries ], feed_dict = { training : True } )
             if step % 20 == 0:
                 summary_writer.add_summary( smry, step )
-            if step % 10000 == 0 and do_val:
+            if step % 1000 == 0 and do_val:
                 cnt = 0
                 for i in range( no_test_batches ):
                     corr = sess.run( num_correct, feed_dict = { training : False } )
                     cnt += corr
-                tf.logging.log( tf.logging.INFO, "Step: " + str( step ) + " - Test batch complete: accr = " + str( cnt / (no_test_batches*batch_size) )  )
+                tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Step: " + str( step ) + " - Test batch complete: accr = " + str( cnt / (no_test_batches*batch_size) )  )
     except KeyboardInterrupt:
-        tf.logging.log( tf.logging.INFO, "Ctrl-c recieved, training stopped" )
+        tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Ctrl-c recieved, training stopped" )
     return
 
 def print_conf_mat( preds, labels ):
@@ -186,6 +187,8 @@ def get_args():
                          help = "The dataset to validate on when training" )
     parser.add_argument( "--steps", type = int,
                          help = "The number of training steps" )
+    parser.add_argument( "--epochs", type = int,
+                         help = "The number of training epochs" )
     parser.add_argument( "--test", action = "store_true",
                          help = "Test the model on this dataset" )
     parser.add_argument( "--no_mean", action = "store_true",
@@ -200,6 +203,7 @@ def get_args():
                          help = "The learning rate to use when training" )
     group = parser.add_mutually_exclusive_group( required = True )
     group.add_argument("--resnet", action='store_true', help = "Run resnet" )
+    group.add_argument("--resnet_twn", action='store_true', help = "Run resnet_twn" )
     group.add_argument("--full_prec", action='store_true', help = "Run full precision VGG with SELU" )
     group.add_argument("--twn", action='store_true', help = "Run Vgg with ternary weights" )
     group.add_argument("--twn_binary_act", action='store_true', help = "Run Vgg with ternary weights and binary activations" )
@@ -219,11 +223,17 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
+
+    # computing the required steps
+    args.steps = math.ceil(24*26*0.9*4100/args.epochs)
+    print("Epochs: %d" % (args.epochs))
+    print("Steps: %d" % (args.steps))
+    
     iterator = batcher( args.dataset, args.batch_size, not args.test, args.teacher_dset )
     if args.gpus is not None:
         os.environ["CUDA_VISIBLE_DEVICES"]=args.gpus
-    tf.logging.set_verbosity( tf.logging.INFO )
-    training = tf.placeholder( tf.bool, name = "training" )
+    tf.compat.v1.logging.set_verbosity( tf.compat.v1.logging.INFO )
+    training = tf.compat.v1.placeholder( tf.bool, name = "training" )
     if not args.test:
         if args.teacher_dset:
             train_signal, train_label, train_snr, teacher = iterator.get_next()
@@ -250,9 +260,15 @@ if __name__ == "__main__":
     if args.resnet:
         with tf.variable_scope("teacher"):
             pred = resnet.get_net( signal, training = training, remove_mean = not args.no_mean )
+    if args.resnet_twn:
+        nu = [args.nu_conv]*6 + [args.nu_dense]*3
+        act_prec = [16]*9 	# quantize [0-1]
+        #act_prec = [None]*9 	
+        pred = resnet.get_net(signal, training=training, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec)
     elif args.full_prec:
         pred = Vgg10.get_net( signal, training, use_SELU = True, act_prec = None, nu = None, no_filt = no_filt, remove_mean = not args.no_mean )
     elif args.twn:
+        act_prec = [16]*9 	# quantize [0-1]
         pred = Vgg10.get_net( signal, training, use_SELU = False, act_prec = None, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
     elif args.twn_binary_act:
         act_prec = [1]*9
@@ -277,13 +293,13 @@ if __name__ == "__main__":
         if args.teacher_dset:
             resnet_pred = teacher
         opt = get_optimizer( pred, label, args.learning_rate, resnet_pred )
-    init_op = tf.global_variables_initializer()
-    saver = tf.train.Saver()
-    tf.summary.histogram( "snr", snr )
-    with tf.Session() as sess:
+    init_op = tf.compat.v1.global_variables_initializer()
+    saver = tf.compat.v1.train.Saver()
+    tf.compat.v1.summary.histogram( "snr", snr )
+    with tf.compat.v1.Session() as sess:
         try:
             if not args.test:
-                smry_wrt = tf.summary.FileWriter( args.model_name + "_logs", sess.graph, session = sess )
+                smry_wrt = tf.compat.v1.summary.FileWriter( args.model_name + "_logs", sess.graph, session = sess )
                 sess.run( iterator.initializer )
                 if do_val:
                     sess.run( test_iterator.initializer )

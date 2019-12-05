@@ -85,3 +85,14 @@ To test the quantized performance on all models run
  keywords = {Low-precision machine learning, sparse matrix operations, ternary neural networks},
 } 
 ```
+
+## cheatsheet:
+
+tensorboard:
+
+	tensorboard --logdir ramintest_F32_logs/ --port 8080
+
+running: 
+	
+	python3 run_cnn.py --model_name ../models/ramintest_F32 --dataset /opt/datasets/deepsig/modulation_classification_resnet_train.rcrd --val_dataset /opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd --epochs=10 --batch_size 64 --learning_rate 0.01 --resnet_twn --nu_conv 1.2 --nu_dense 0.7 --gpus 1
+

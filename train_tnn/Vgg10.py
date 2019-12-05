@@ -3,8 +3,6 @@
 import tensorflow as tf
 import quantization as q
 
-def get_initializer():
-    return tf.variance_scaling_initializer(scale=1.0, mode='fan_in')
 
 def get_conv_layer_full_prec( x, training, no_filt = 64 ):
     cnn = tf.layers.conv1d( x, no_filt, 3, padding = "SAME", use_bias = False )
@@ -61,8 +59,8 @@ def get_net( x, training = False, use_SELU = False, act_prec = None, nu = None, 
         cnn = get_conv_layer( cnn, training, no_filt = no_filt[6], nu = nu[6], act_prec = act_prec[6] )
     cnn = tf.layers.flatten( cnn )
     if use_SELU:
-        dense_1 = tf.get_variable( "dense_8", [ cnn.get_shape()[-1], no_filt[7] ], initializer = get_initializer() )
-        dense_2 = tf.get_variable( "dense_9", [ no_filt[7], no_filt[8] ], initializer = get_initializer() )
+        dense_1 = tf.get_variable( "dense_8", [ cnn.get_shape()[-1], no_filt[7] ], initializer=q.get_initializer() )
+        dense_2 = tf.get_variable( "dense_9", [ no_filt[7], no_filt[8] ], initializer=q.get_initializer() )
         with tf.variable_scope("dense_1"):
             cnn = tf.matmul( cnn, dense_1 )
             cnn = tf.nn.selu( cnn )
