@@ -96,3 +96,11 @@ running:
 	
 	python3 run_cnn.py --model_name ../models/ramintest_F32 --dataset /opt/datasets/deepsig/modulation_classification_resnet_train.rcrd --val_dataset /opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd --epochs=10 --batch_size 64 --learning_rate 0.01 --resnet_twn --nu_conv 1.2 --nu_dense 0.7 --gpus 1
 
+generating verilogs:
+
+	cd verilog_generation
+	cat generate_tw_vgg10.py
+	cat generate_f128.sh
+	MODEL_DIR=../models/vgg_twn_nu_1.2_0.7_f128
+	rm $MODEL_DIR/*_td*
+	time python3 generate_tw_vgg10.py --model_dir $MODEL_DIR --bws_in 16,16,8,4,2,1,1 --bws_out 16,16,8,4,2,1,1 -t n,n,s,s,s,s,s

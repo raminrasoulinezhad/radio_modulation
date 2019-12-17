@@ -257,6 +257,7 @@ if __name__ == "__main__":
         no_filt = args.no_filt_vgg
     if args.no_filts is not None:
         no_filt = [ int(x) for x in args.no_filts.split(",") ]
+
     if args.resnet:
         with tf.variable_scope("teacher"):
             pred = resnet.get_net( signal, training = training, remove_mean = not args.no_mean )
@@ -264,7 +265,9 @@ if __name__ == "__main__":
         nu = [args.nu_conv]*6 + [args.nu_dense]*3
         act_prec = [16]*9 	# quantize [0-1]
         #act_prec = [None]*9 	
-        pred = resnet.get_net(signal, training=training, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec)
+        opt_ResBlock = True
+        pred = resnet.get_net(signal, training=training, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec, opt_ResBlock=opt_ResBlock)
+
     elif args.full_prec:
         pred = Vgg10.get_net( signal, training, use_SELU = True, act_prec = None, nu = None, no_filt = no_filt, remove_mean = not args.no_mean )
     elif args.twn:

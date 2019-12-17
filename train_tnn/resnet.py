@@ -46,7 +46,7 @@ def conv_batch_relu(x, training=False, no_filt=128, nu=None, act_prec=None, kern
 		cnn = q.quant(cnn, act_prec, shift=not(relu_en))
 	return cnn
 
-def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="SAME"):
+def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", opt_ResBlock=False): 
 	no_filt = x.get_shape()[-1]
 	with tf.variable_scope("res_unit_a"):
 		cnn = conv_batch_relu(x, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding)
@@ -54,27 +54,29 @@ def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="
 		#cnn = tf.layers.batch_normalization( cnn, training = training )
 		#cnn = tf.nn.relu( cnn )
 	with tf.variable_scope("res_unit_b"):
-		cnn = conv_batch_relu(cnn, training, no_filt=no_filt, nu=nu, act_prec=None, kernel=kernel, padding=padding, relu_en=False)
-		#cnn = tf.layers.conv1d( cnn, no_filt, 3, padding = "SAME" )
-		#cnn = tf.layers.batch_normalization( cnn, training = training )
+		if not opt_ResBlock:
+			cnn = conv_batch_relu(cnn, training, no_filt=no_filt, nu=nu, act_prec=None, kernel=kernel, padding=padding, relu_en=False)
+			#cnn = tf.layers.conv1d( cnn, no_filt, 3, padding = "SAME" )
+			#cnn = tf.layers.batch_normalization( cnn, training = training )
+
 		cnn = cnn + x # shortcut
 		cnn = q.relu_q(cnn, act_prec=act_prec)
 		#cnn = tf.nn.relu( cnn )
 		return cnn
 
-def residual_stack(x, no_filt, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False):
+def residual_stack(x, no_filt, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False, opt_ResBlock=False):
 	with tf.compat.v1.variable_scope("res_stack_a"):
 		cnn = conv_batch_relu(x, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding, use_bias=use_bias, relu_en=False)
 		#cnn = tf.layers.conv1d( x, no_filt, 3, padding = "SAME" )
 		#cnn = tf.layers.batch_normalization( cnn, training = training )
 	with tf.variable_scope("res_stack_b"):
-		cnn = residual_unit( cnn, training = training )
+		cnn = residual_unit(cnn, training=training, opt_ResBlock=opt_ResBlock)
 	with tf.variable_scope("res_stack_c"):
-		cnn = residual_unit( cnn, training = training )
+		cnn = residual_unit(cnn, training=training, opt_ResBlock=opt_ResBlock)
 	cnn = tf.layers.max_pooling1d( cnn, 2, 2 )
 	return cnn
 
-def get_net(x, training = False, no_filt=32, remove_mean=True, nu=None, act_prec=None, kernel=3):
+def get_net(x, training = False, no_filt=32, remove_mean=True, nu=None, act_prec=None, kernel=3, opt_ResBlock=False):
 	#nu = [nu] * (6+3)
 	#act_prec = [act_prec] * (6+3)
 	#kernel = [kernel] * (6+3)
@@ -92,17 +94,17 @@ def get_net(x, training = False, no_filt=32, remove_mean=True, nu=None, act_prec
 		x = ( x - mean )
 
 	with tf.compat.v1.variable_scope("block_1"):
-		cnn = residual_stack(x, no_filt, training=training, nu=nu[0], act_prec=act_prec[0], kernel=kernel[0])
+		cnn = residual_stack(x, no_filt, training=training, nu=nu[0], act_prec=act_prec[0], kernel=kernel[0], opt_ResBlock=opt_ResBlock)
 	with tf.compat.v1.variable_scope("block_2"):
-		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[1], act_prec=act_prec[1], kernel=kernel[1])
+		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[1], act_prec=act_prec[1], kernel=kernel[1], opt_ResBlock=opt_ResBlock)
 	with tf.compat.v1.variable_scope("block_3"):
-		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[2], act_prec=act_prec[2], kernel=kernel[2])
+		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[2], act_prec=act_prec[2], kernel=kernel[2], opt_ResBlock=opt_ResBlock)
 	with tf.compat.v1.variable_scope("block_4"):
-		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[3], act_prec=act_prec[3], kernel=kernel[3])
+		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[3], act_prec=act_prec[3], kernel=kernel[3], opt_ResBlock=opt_ResBlock)
 	with tf.compat.v1.variable_scope("block_5"):
-		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[4], act_prec=act_prec[4], kernel=kernel[4])
+		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[4], act_prec=act_prec[4], kernel=kernel[4], opt_ResBlock=opt_ResBlock)
 	with tf.compat.v1.variable_scope("block_6"):
-		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[5], act_prec=act_prec[5], kernel=kernel[5])
+		cnn = residual_stack(cnn, no_filt, training=training, nu=nu[5], act_prec=act_prec[5], kernel=kernel[5], opt_ResBlock=opt_ResBlock)
 
 	cnn = tf.layers.flatten(cnn)
 
