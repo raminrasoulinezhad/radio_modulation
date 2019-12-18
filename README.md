@@ -88,6 +88,10 @@ To test the quantized performance on all models run
 
 ## cheatsheet:
 
+install:
+	
+	pip3 install tensorflow-gpu==1.14 tqdm
+
 tensorboard:
 
 	tensorboard --logdir ramintest_F32_logs/ --port 8080
