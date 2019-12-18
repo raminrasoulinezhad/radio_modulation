@@ -76,7 +76,7 @@ def batcher( input_file, batch_size, training = True, use_teacher = False ):
         else:
             dset = dset.filter( filter_snr )
         dset = dset.repeat()
-        dset = dset.shuffle( 8*batch_size )
+        dset = dset.shuffle(256*batch_size) #8*batch_size q
     dset = dset.batch( batch_size )
     if training:
         iterator = dset.make_initializable_iterator()
@@ -91,7 +91,7 @@ def get_optimizer( pred, label, learning_rate, resnet_pred = None ):
         name = "softmax_err_func"
     )
     err = tf.reduce_sum( err )
-    tf.summary.scalar( "train_err", err )
+    tf.compat.v1.summary.scalar( "train_err", err )
     if resnet_pred is not None:
         student_err = tf.sqrt( tf.nn.l2_loss( resnet_pred - pred ) )/5
         tf.summary.scalar( "student_err", student_err )
@@ -107,7 +107,7 @@ def get_optimizer( pred, label, learning_rate, resnet_pred = None ):
         learning_rate,
         tf.compat.v1.train.get_or_create_global_step(),
         100000,
-        0.5
+        0.3 #0.5
     )
     # lr = learning_rate
     pred = tf.math.argmax( pred, axis = 1 )
@@ -147,17 +147,17 @@ def train_loop( opt, summary_writer, num_correct, training, no_test_batches, bat
     try:
         for i in range( step, no_steps ):
             step, _, smry = sess.run( [ curr_step, opt, summaries ], feed_dict = { training : True } )
-            if step % 20 == 0:
+            if (step+1) % 20 == 0:
                 summary_writer.add_summary( smry, step )
 
-            if step % log_steps == 0 and do_val:
+            if (step+1) % log_steps == 0 and do_val:
                 cnt = 0
                 for i in range( no_test_batches ):
                     corr = sess.run( num_correct, feed_dict = { training : False } )
                     cnt += corr
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Step: " + str( step ) + " - Test batch complete: accr = " + str( cnt / (no_test_batches*batch_size) )  )
             
-            if step % epoch_steps == 0 and do_val:
+            if (step+1) % epoch_steps == 0 and do_val:
                 cnt = 0
                 for i in range( no_test_batches ):
                     corr = sess.run( num_correct, feed_dict = { training : False } )
@@ -279,7 +279,8 @@ if __name__ == "__main__":
         act_prec = [16]*9 	# quantize [0-1]
         #act_prec = [None]*9 	
         opt_ResBlock = True
-        pred = resnet.get_net(signal, training=training, no_filt=args.channel, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec, opt_ResBlock=opt_ResBlock)
+        pred = resnet.get_net(signal, training=training, no_filt=args.channel, remove_mean=not args.no_mean, nu=nu, 
+        	act_prec=act_prec, opt_ResBlock=opt_ResBlock, n_stack=4, n_convs=2)
 
     elif args.full_prec:
         pred = Vgg10.get_net( signal, training, use_SELU=True, act_prec = None, nu = None, no_filt = no_filt, remove_mean = not args.no_mean )
@@ -325,15 +326,15 @@ if __name__ == "__main__":
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Loading model ... " )
                 saver.restore(sess, args.model_name )
             if args.teacher_name is not None and tf.train.checkpoint_exists( args.teacher_name ):
-                tf.logging.log( tf.logging.INFO, "Loading teacher ... " )
+                tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Loading teacher ... " )
                 resnet_saver.restore(sess, args.teacher_name )
             if args.test:
                 test_loop( snr, pred, label, training, args.test_output, args.test_batches )
             else:
-                train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=1000, epoch_steps=epoch_steps_train)
+                train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=10000, epoch_steps=epoch_steps_train)
         except tf.errors.OutOfRangeError:
-            tf.logging.log( tf.logging.INFO, "Dataset is finished" )
+            tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Dataset is finished" )
         finally:
             if not args.test:
-                tf.logging.log( tf.logging.INFO, "Saving model ... " )
+                tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Saving model ... " )
                 saver.save( sess, args.model_name )
