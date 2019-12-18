@@ -139,7 +139,7 @@ def test_loop( snr, pred, label, training, fname, no_loops ):
     tf.logging.log( tf.logging.INFO, "Test done, accr = : " + str( corr_cnt / total_cnt ) )
     f_out.close()
 
-def train_loop( opt, summary_writer, num_correct, training, no_test_batches, batch_size, no_steps = 100000, do_val = True ):
+def train_loop( opt, summary_writer, num_correct, training, no_test_batches, batch_size, no_steps=100000, do_val=True, log_steps=1000):
     summaries = tf.compat.v1.summary.merge_all()
     curr_step = tf.compat.v1.train.get_global_step()
     step = sess.run( curr_step )
@@ -149,7 +149,7 @@ def train_loop( opt, summary_writer, num_correct, training, no_test_batches, bat
             step, _, smry = sess.run( [ curr_step, opt, summaries ], feed_dict = { training : True } )
             if step % 20 == 0:
                 summary_writer.add_summary( smry, step )
-            if step % 1000 == 0 and do_val:
+            if step % log_steps == 0 and do_val:
                 cnt = 0
                 for i in range( no_test_batches ):
                     corr = sess.run( num_correct, feed_dict = { training : False } )
@@ -227,7 +227,9 @@ if __name__ == "__main__":
     args = get_args()
 
     # computing the required steps
-    args.steps = math.ceil(24*26*0.9*4100*args.epochs)
+    epoch_steps = 24*26*4100
+    epoch_steps_train = epoch_steps*0.9
+    args.steps = math.ceil(epoch_steps_train*args.epochs)
     print("Epochs: %d" % (args.epochs))
     print("Steps: %d" % (args.steps))
     
@@ -268,8 +270,7 @@ if __name__ == "__main__":
         act_prec = [16]*9 	# quantize [0-1]
         #act_prec = [None]*9 	
         opt_ResBlock = True
-        no_filt = 64
-        pred = resnet.get_net(signal, training=training, no_filt=no_filt, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec, opt_ResBlock=opt_ResBlock)
+        pred = resnet.get_net(signal, training=training, no_filt=args.channel, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec, opt_ResBlock=opt_ResBlock)
 
     elif args.full_prec:
         pred = Vgg10.get_net( signal, training, use_SELU=True, act_prec = None, nu = None, no_filt = no_filt, remove_mean = not args.no_mean )
@@ -320,7 +321,7 @@ if __name__ == "__main__":
             if args.test:
                 test_loop( snr, pred, label, training, args.test_output, args.test_batches )
             else:
-                train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps = args.steps, do_val = do_val )
+                train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=epoch_steps_train)
         except tf.errors.OutOfRangeError:
             tf.logging.log( tf.logging.INFO, "Dataset is finished" )
         finally:
