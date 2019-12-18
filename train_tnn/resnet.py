@@ -76,12 +76,9 @@ def residual_stack(x, no_filt, training=False, nu=None, act_prec=None, kernel=3,
 	cnn = tf.layers.max_pooling1d( cnn, 2, 2 )
 	return cnn
 
-def get_net(x, training = False, no_filt=32, remove_mean=True, nu=None, act_prec=None, kernel=3, opt_ResBlock=False):
-	#nu = [nu] * (6+3)
-	#act_prec = [act_prec] * (6+3)
-	#kernel = [kernel] * (6+3)
-
+def get_net(x, training = False, no_filt=64, remove_mean=True, nu=None, act_prec=None, kernel=3, opt_ResBlock=False):
 	kernel = [kernel] * (6+3)
+	
 	print(nu)
 	print(act_prec)
 	print(kernel)

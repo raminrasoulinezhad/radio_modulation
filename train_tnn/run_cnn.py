@@ -187,7 +187,7 @@ def get_args():
                          help = "The dataset to validate on when training" )
     parser.add_argument( "--steps", type = int,
                          help = "The number of training steps" )
-    parser.add_argument( "--epochs", type = int,
+    parser.add_argument( "--epochs", type = int, default = 50,
                          help = "The number of training epochs" )
     parser.add_argument( "--test", action = "store_true",
                          help = "Test the model on this dataset" )
@@ -199,7 +199,7 @@ def get_args():
                          help = "Number of batches to run on" )
     parser.add_argument( "--batch_size", type=int, default = 64,
                          help = "Batch size to use" )
-    parser.add_argument( "--learning_rate", type=float, default = 0.001,
+    parser.add_argument( "--learning_rate", type=float, default = 0.01,
                          help = "The learning rate to use when training" )
     group = parser.add_mutually_exclusive_group( required = True )
     group.add_argument("--resnet", action='store_true', help = "Run resnet" )
@@ -217,15 +217,17 @@ def get_args():
                                help = "number of filters to use for vgg" )
     vgg_filt_grp.add_argument( "--no_filts", type=str,
                                help = "number of filters to use for vgg" )
-    parser.add_argument( "--gpus", type=str,
-                         help = "GPUs to use" )
+    parser.add_argument( "--gpus", type=str, help = "GPUs to use" )
+
+    parser.add_argument( "--channel", type=int, default=64, help="channel size" )
+
     return parser.parse_args()
 
 if __name__ == "__main__":
     args = get_args()
 
     # computing the required steps
-    args.steps = math.ceil(24*26*0.9*4100/args.epochs)
+    args.steps = math.ceil(24*26*0.9*4100*args.epochs)
     print("Epochs: %d" % (args.epochs))
     print("Steps: %d" % (args.steps))
     
@@ -260,22 +262,23 @@ if __name__ == "__main__":
 
     if args.resnet:
         with tf.variable_scope("teacher"):
-            pred = resnet.get_net( signal, training = training, remove_mean = not args.no_mean )
+            pred = resnet.get_net( signal, training=training, remove_mean = not args.no_mean )
     if args.resnet_twn:
         nu = [args.nu_conv]*6 + [args.nu_dense]*3
         act_prec = [16]*9 	# quantize [0-1]
         #act_prec = [None]*9 	
         opt_ResBlock = True
-        pred = resnet.get_net(signal, training=training, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec, opt_ResBlock=opt_ResBlock)
+        no_filt = 64
+        pred = resnet.get_net(signal, training=training, no_filt=no_filt, remove_mean=not args.no_mean, nu=nu, act_prec=act_prec, opt_ResBlock=opt_ResBlock)
 
     elif args.full_prec:
-        pred = Vgg10.get_net( signal, training, use_SELU = True, act_prec = None, nu = None, no_filt = no_filt, remove_mean = not args.no_mean )
+        pred = Vgg10.get_net( signal, training, use_SELU=True, act_prec = None, nu = None, no_filt = no_filt, remove_mean = not args.no_mean )
     elif args.twn:
         act_prec = [16]*9 	# quantize [0-1]
-        pred = Vgg10.get_net( signal, training, use_SELU = False, act_prec = None, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
+        pred = Vgg10.get_net( signal, training, use_SELU=False, act_prec = None, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
     elif args.twn_binary_act:
         act_prec = [1]*9
-        pred = Vgg10.get_net( signal, training, use_SELU = False, act_prec = act_prec, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
+        pred = Vgg10.get_net( signal, training, use_SELU=False, act_prec = act_prec, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
     elif args.twn_incr_act is not None:
         # last conv and dense layers should be bin
         act_prec = [1]*args.twn_incr_act + [ 1 << ( i + 1 ) for i in range(6-args.twn_incr_act) ] + [1]*3
