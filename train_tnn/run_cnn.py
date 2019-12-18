@@ -139,7 +139,7 @@ def test_loop( snr, pred, label, training, fname, no_loops ):
     tf.logging.log( tf.logging.INFO, "Test done, accr = : " + str( corr_cnt / total_cnt ) )
     f_out.close()
 
-def train_loop( opt, summary_writer, num_correct, training, no_test_batches, batch_size, no_steps=100000, do_val=True, log_steps=1000):
+def train_loop( opt, summary_writer, num_correct, training, no_test_batches, batch_size, no_steps=100000, do_val=True, log_steps=1000, epoch_steps=math.ceil(24*26*4100*0.9)):
     summaries = tf.compat.v1.summary.merge_all()
     curr_step = tf.compat.v1.train.get_global_step()
     step = sess.run( curr_step )
@@ -149,12 +149,21 @@ def train_loop( opt, summary_writer, num_correct, training, no_test_batches, bat
             step, _, smry = sess.run( [ curr_step, opt, summaries ], feed_dict = { training : True } )
             if step % 20 == 0:
                 summary_writer.add_summary( smry, step )
+
             if step % log_steps == 0 and do_val:
                 cnt = 0
                 for i in range( no_test_batches ):
                     corr = sess.run( num_correct, feed_dict = { training : False } )
                     cnt += corr
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Step: " + str( step ) + " - Test batch complete: accr = " + str( cnt / (no_test_batches*batch_size) )  )
+            
+            if step % epoch_steps == 0 and do_val:
+                cnt = 0
+                for i in range( no_test_batches ):
+                    corr = sess.run( num_correct, feed_dict = { training : False } )
+                    cnt += corr
+                tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch: accr = " + str(cnt/(no_test_batches*batch_size)))
+
     except KeyboardInterrupt:
         tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Ctrl-c recieved, training stopped" )
     return
@@ -187,7 +196,7 @@ def get_args():
                          help = "The dataset to validate on when training" )
     parser.add_argument( "--steps", type = int,
                          help = "The number of training steps" )
-    parser.add_argument( "--epochs", type = int, default = 50,
+    parser.add_argument( "--epochs", type = int, default = 2,
                          help = "The number of training epochs" )
     parser.add_argument( "--test", action = "store_true",
                          help = "Test the model on this dataset" )
@@ -228,9 +237,9 @@ if __name__ == "__main__":
 
     # computing the required steps
     epoch_steps = 24*26*4100
-    epoch_steps_train = epoch_steps*0.9
-    args.steps = math.ceil(epoch_steps_train*args.epochs)
-    print("Epochs: %d" % (args.epochs))
+    epoch_steps_train = math.ceil(epoch_steps*0.9)
+    args.steps = epoch_steps_train*args.epochs
+    print("Epochs: %d, each: %d steps" % (args.epochs, epoch_steps_train))
     print("Steps: %d" % (args.steps))
     
     iterator = batcher( args.dataset, args.batch_size, not args.test, args.teacher_dset )
@@ -313,7 +322,7 @@ if __name__ == "__main__":
             sess.run( init_op )
             # load the model if possible
             if tf.train.checkpoint_exists( args.model_name ):
-                tf.logging.log( tf.logging.INFO, "Loading model ... " )
+                tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Loading model ... " )
                 saver.restore(sess, args.model_name )
             if args.teacher_name is not None and tf.train.checkpoint_exists( args.teacher_name ):
                 tf.logging.log( tf.logging.INFO, "Loading teacher ... " )
@@ -321,7 +330,7 @@ if __name__ == "__main__":
             if args.test:
                 test_loop( snr, pred, label, training, args.test_output, args.test_batches )
             else:
-                train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=epoch_steps_train)
+                train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=1000, epoch_steps=epoch_steps_train)
         except tf.errors.OutOfRangeError:
             tf.logging.log( tf.logging.INFO, "Dataset is finished" )
         finally:
