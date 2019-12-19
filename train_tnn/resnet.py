@@ -60,6 +60,7 @@ def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="
 			#cnn = tf.layers.batch_normalization( cnn, training = training )
 
 		cnn = cnn + x # shortcut
+		cnn = tf.layers.batch_normalization(cnn, training=training) ########################################### it is added by me
 		cnn = q.relu_q(cnn, act_prec=act_prec)
 		#cnn = tf.nn.relu( cnn )
 		return cnn

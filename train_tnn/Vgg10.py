@@ -15,7 +15,7 @@ def get_conv_layer( x, training, no_filt = 128, nu = None, act_prec = True ):
     if nu is None:
         return get_conv_layer_full_prec( x, training, no_filt )
     filter_shape = [ 3, x.get_shape()[-1], no_filt ]
-    conv_filter = tf.get_variable( "conv_filter", filter_shape )
+    conv_filter = tf.compat.v1.get_variable( "conv_filter", filter_shape )
     tf.summary.histogram( "conv_filter_fp", conv_filter )
     conv_filter = q.trinarize( conv_filter, nu = nu  )
     cnn = tf.nn.conv1d( x, conv_filter, 1, padding = "SAME" )
@@ -43,19 +43,19 @@ def get_net( x, training = False, use_SELU = False, act_prec = None, nu = None, 
         no_filt = [no_filt]*7 + [128,128,24]
     else:
         assert len(no_filt) == 10, "Incorrect length of no_filt for custom"
-    with tf.variable_scope("lyr1"):
+    with tf.compat.v1.variable_scope("lyr1"):
         cnn = get_conv_layer( x, training, no_filt = no_filt[0], nu = nu[0], act_prec = act_prec[0] )
-    with tf.variable_scope("lyr2"):
+    with tf.compat.v1.variable_scope("lyr2"):
         cnn = get_conv_layer( cnn, training, no_filt = no_filt[1], nu = nu[1], act_prec = act_prec[1] )
-    with tf.variable_scope("lyr3"):
+    with tf.compat.v1.variable_scope("lyr3"):
         cnn = get_conv_layer( cnn, training, no_filt = no_filt[2], nu = nu[2], act_prec = act_prec[2] )
-    with tf.variable_scope("lyr4"):
+    with tf.compat.v1.variable_scope("lyr4"):
         cnn = get_conv_layer( cnn, training, no_filt = no_filt[3], nu = nu[3], act_prec = act_prec[3] )
-    with tf.variable_scope("lyr5"):
+    with tf.compat.v1.variable_scope("lyr5"):
         cnn = get_conv_layer( cnn, training, no_filt = no_filt[4], nu = nu[4], act_prec = act_prec[4] )
-    with tf.variable_scope("lyr6"):
+    with tf.compat.v1.variable_scope("lyr6"):
         cnn = get_conv_layer( cnn, training, no_filt = no_filt[5], nu = nu[5], act_prec = act_prec[5] )
-    with tf.variable_scope("lyr7"):
+    with tf.compat.v1.variable_scope("lyr7"):
         cnn = get_conv_layer( cnn, training, no_filt = no_filt[6], nu = nu[6], act_prec = act_prec[6] )
     cnn = tf.layers.flatten( cnn )
     if use_SELU:

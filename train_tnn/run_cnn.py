@@ -114,8 +114,8 @@ def get_optimizer( pred, label, learning_rate, resnet_pred = None ):
     correct = tf.cast( tf.math.equal( pred, tf.cast( label, tf.int64 ) ), tf.float32 )
     accr = tf.reduce_mean( correct )
     tf.compat.v1.summary.histogram( "preds", pred )
-    tf.summary.scalar( "learning_rate", tf.reduce_sum( lr ) )
-    tf.summary.scalar( "accuracy", accr )
+    tf.compat.v1.summary.scalar( "learning_rate", tf.reduce_sum( lr ) )
+    tf.compat.v1.summary.scalar( "accuracy", accr )
     update_ops = tf.compat.v1.get_collection(tf.compat.v1.GraphKeys.UPDATE_OPS)
     opt = tf.compat.v1.train.AdamOptimizer( lr )
     with tf.control_dependencies(update_ops):
@@ -334,6 +334,10 @@ if __name__ == "__main__":
                 train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=10000, epoch_steps=epoch_steps_train)
         except tf.errors.OutOfRangeError:
             tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Dataset is finished" )
+            
+            tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Saving model ... " )
+        	saver.save( sess, args.model_name )
+        	
         finally:
             if not args.test:
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Saving model ... " )
