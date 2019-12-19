@@ -155,7 +155,7 @@ def train_loop( opt, summary_writer, num_correct, training, no_test_batches, bat
                 for i in range( no_test_batches ):
                     corr = sess.run( num_correct, feed_dict = { training : False } )
                     cnt += corr
-                tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Step: " + str( step ) + " - Test batch complete: accr = " + str( cnt / (no_test_batches*batch_size) )  )
+                tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Step: " + str(step+1) + " - Test batch complete: accr = " + str( cnt / (no_test_batches*batch_size) )  )
             
             if (step+1) % epoch_steps == 0 and do_val:
                 cnt = 0
@@ -334,10 +334,7 @@ if __name__ == "__main__":
                 train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=10000, epoch_steps=epoch_steps_train)
         except tf.errors.OutOfRangeError:
             tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Dataset is finished" )
-            
-            tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Saving model ... " )
-        	saver.save( sess, args.model_name )
-        	
+
         finally:
             if not args.test:
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Saving model ... " )

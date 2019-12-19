@@ -81,7 +81,6 @@ def get_net( x, training = False, use_SELU = False, act_prec = None, nu = None, 
         tf.summary.histogram( "dense_1_tri", dense_1 )
         tf.summary.histogram( "dense_2_tri", dense_2 )
         with tf.variable_scope("dense_1"):
-            print(cnn.get_shape())
             cnn = tf.matmul( cnn, dense_1 )
             cnn = tf.layers.batch_normalization( cnn, training = training )
             if act_prec[7] is not None:
@@ -89,7 +88,6 @@ def get_net( x, training = False, use_SELU = False, act_prec = None, nu = None, 
             else:
                 cnn = tf.nn.relu( cnn )
         with tf.variable_scope("dense_2"):
-            print(cnn.get_shape())
             cnn = tf.matmul( cnn, dense_2 )
             cnn = tf.layers.batch_normalization( cnn, training = training )
             if act_prec[8] is not None:
@@ -97,6 +95,5 @@ def get_net( x, training = False, use_SELU = False, act_prec = None, nu = None, 
             else:
                 cnn = tf.nn.relu( cnn )
     with tf.variable_scope("dense_3"):
-        print(cnn.get_shape())
         pred = tf.layers.dense( cnn, no_filt[9], use_bias = False )
     return pred

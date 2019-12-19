@@ -3,6 +3,14 @@ import os
 import tensorflow as tf
 import quantization as q
 
+def remover_mean(x, remove_mean):
+	if remove_mean:
+		mean, var = tf.nn.moments(x, axes=[1])
+		mean = tf.expand_dims(mean, 1)
+		mean = tf.tile(mean, [1, x.get_shape()[1], 1])
+		x = (x - mean)
+	return x
+
 def dense_batch_selu_drop_relu(x, training=False, no_filt=128, nu=None, act_prec=None, bn_en=True, selu_en=False, drop_en=True, drop_rate=0.95, relu_en=False):
 	if nu is None:
 		cnn = tf.layers.dense(x, 128, kernel_initializer=q.get_initializer())
@@ -48,92 +56,56 @@ def conv_batch_relu(x, training=False, no_filt=128, nu=None, act_prec=None, kern
 
 def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", opt_ResBlock=False): 
 	no_filt = x.get_shape()[-1]
-	with tf.variable_scope("res_unit_a"):
+	
+	with tf.variable_scope("res_unit_0"):
 		cnn = conv_batch_relu(x, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding)
-		#cnn = tf.layers.conv1d( x, no_filt, 3, padding = "SAME" )
-		#cnn = tf.layers.batch_normalization( cnn, training = training )
-		#cnn = tf.nn.relu( cnn )
-	with tf.variable_scope("res_unit_b"):
-		if not opt_ResBlock:
-			cnn = conv_batch_relu(cnn, training, no_filt=no_filt, nu=nu, act_prec=None, kernel=kernel, padding=padding, relu_en=False)
-			#cnn = tf.layers.conv1d( cnn, no_filt, 3, padding = "SAME" )
-			#cnn = tf.layers.batch_normalization( cnn, training = training )
 
-		cnn = cnn + x # shortcut
-		cnn = tf.layers.batch_normalization(cnn, training=training) ########################################### it is added by me
-		cnn = q.relu_q(cnn, act_prec=act_prec)
-		#cnn = tf.nn.relu( cnn )
-		return cnn
+	with tf.variable_scope("res_unit_1"):
+		if not opt_ResBlock:
+			# act_prec=None ==> a floating foint adder is required
+			# maybe I should make it act_prec=16 as well
+			cnn = conv_batch_relu(cnn, training, no_filt=no_filt, nu=nu, act_prec=None, kernel=kernel, padding=padding, relu_en=False)
+
+	cnn = cnn + x 
+	# this batch norm is added by me 
+	cnn = tf.layers.batch_normalization(cnn, training=training) 
+	cnn = q.relu_q(cnn, act_prec=act_prec)
+
+	return cnn
 
 def residual_stack(x, no_filt, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False, opt_ResBlock=False, n_convs=3):
-	with tf.compat.v1.variable_scope("res_stack_a"):
+	with tf.compat.v1.variable_scope("NConv"):
 		cnn = conv_batch_relu(x, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding, use_bias=use_bias, relu_en=False)
-		#cnn = tf.layers.conv1d( x, no_filt, 3, padding = "SAME" )
-		#cnn = tf.layers.batch_normalization( cnn, training = training )
 
-	for i in range(n_convs-1):
-		with tf.variable_scope("res_stack_"+str(i)):
+	for i in range(0,n_convs-1):
+		with tf.variable_scope("ResBlock_"+str(i)):
 			cnn = residual_unit(cnn, training=training, opt_ResBlock=opt_ResBlock)
 
-	#with tf.variable_scope("res_stack_b"):
-	#	cnn = residual_unit(cnn, training=training, opt_ResBlock=opt_ResBlock)
-	#with tf.variable_scope("res_stack_c"):
-	#	cnn = residual_unit(cnn, training=training, opt_ResBlock=opt_ResBlock)
 	cnn = tf.layers.max_pooling1d( cnn, 2, 2 )
 	return cnn
 
 def get_net(x, training = False, no_filt=64, remove_mean=True, nu=None, act_prec=None, kernel=3, opt_ResBlock=False, n_stack=6, n_convs=3):
+	
 	kernel = [kernel] * (6+3)
 
-	print(nu)
-	print(act_prec)
-	print(kernel)
+	print("nu: %s, \nact_prec: %s, \nkernel: %s" % (str(nu),str(act_prec),str(kernel)))
 
 	# remove the bias from all examples and make
-	if remove_mean:
-		mean, var = tf.nn.moments(x, axes=[1])
-		mean = tf.expand_dims( mean, 1 )
-		mean = tf.tile( mean, [ 1, x.get_shape()[1], 1 ] )
-		x = ( x - mean )
+	cnn = remover_mean(x, remove_mean)
 
-	cnn = x
 	for i in range(n_stack):
-		with tf.compat.v1.variable_scope("block_"+str(i)):
-			print(cnn.get_shape())
+		with tf.compat.v1.variable_scope("ResStack_"+str(i)):
 			cnn = residual_stack(cnn, no_filt, training=training, nu=nu[i], act_prec=act_prec[i], kernel=kernel[i], opt_ResBlock=opt_ResBlock, n_convs=n_convs)	
 
-	#with tf.compat.v1.variable_scope("block_1"):
-	#	cnn = residual_stack(x, no_filt, training=training, nu=nu[0], act_prec=act_prec[0], kernel=kernel[0], opt_ResBlock=opt_ResBlock)
-	#with tf.compat.v1.variable_scope("block_2"):
-	#	cnn = residual_stack(cnn, no_filt, training=training, nu=nu[1], act_prec=act_prec[1], kernel=kernel[1], opt_ResBlock=opt_ResBlock)
-	#with tf.compat.v1.variable_scope("block_3"):
-	#	cnn = residual_stack(cnn, no_filt, training=training, nu=nu[2], act_prec=act_prec[2], kernel=kernel[2], opt_ResBlock=opt_ResBlock)
-	#with tf.compat.v1.variable_scope("block_4"):
-	#	cnn = residual_stack(cnn, no_filt, training=training, nu=nu[3], act_prec=act_prec[3], kernel=kernel[3], opt_ResBlock=opt_ResBlock)
-	#with tf.compat.v1.variable_scope("block_5"):
-	#	cnn = residual_stack(cnn, no_filt, training=training, nu=nu[4], act_prec=act_prec[4], kernel=kernel[4], opt_ResBlock=opt_ResBlock)
-	#with tf.compat.v1.variable_scope("block_6"):
-	#	cnn = residual_stack(cnn, no_filt, training=training, nu=nu[5], act_prec=act_prec[5], kernel=kernel[5], opt_ResBlock=opt_ResBlock)
-
-	print(cnn.get_shape())
 	cnn = tf.compat.v1.layers.flatten(cnn)
-	print(cnn.get_shape())
 
-	with tf.variable_scope("dense_7"):
+	with tf.variable_scope("dense_0"):
 		cnn = dense_batch_selu_drop_relu(cnn, training=training, no_filt=128, nu=nu[6], act_prec=act_prec[6])
-		#cnn = tf.layers.dense(cnn, 128, kernel_initializer=q.get_initializer())
-		#cnn = tf.nn.selu( cnn )
-		#dropped = tf.contrib.nn.alpha_dropout( cnn, 0.95 )
-		#cnn = tf.where( training, dropped, cnn )
 
-	with tf.variable_scope("dense_8"):
+	with tf.variable_scope("dense_1"):
 		cnn = dense_batch_selu_drop_relu(cnn, training=training, no_filt=128, nu=nu[7], act_prec=act_prec[7])
-		#cnn = tf.layers.dense(cnn, 128, kernel_initializer=q.get_initializer())
-		#cnn = tf.nn.selu( cnn )
-		#dropped = tf.contrib.nn.alpha_dropout( cnn, 0.95 )
-		#cnn = tf.where( training, dropped, cnn )
 
-	with tf.variable_scope("dense_9"):
+	with tf.variable_scope("dense_2"):
 		pred = tf.layers.dense(cnn, 24)
 
 	return pred
