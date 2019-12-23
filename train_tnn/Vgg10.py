@@ -16,7 +16,7 @@ def get_conv_layer( x, training, no_filt = 128, nu = None, act_prec = True ):
         return get_conv_layer_full_prec( x, training, no_filt )
     filter_shape = [ 3, x.get_shape()[-1], no_filt ]
     conv_filter = tf.compat.v1.get_variable( "conv_filter", filter_shape )
-    tf.summary.histogram( "conv_filter_fp", conv_filter )
+    tf.compat.v1.summary.histogram( "conv_filter_fp", conv_filter )
     conv_filter = q.trinarize( conv_filter, nu = nu  )
     cnn = tf.nn.conv1d( x, conv_filter, 1, padding = "SAME" )
     cnn = tf.layers.max_pooling1d( cnn, 2, 2 )
@@ -72,28 +72,28 @@ def get_net( x, training = False, use_SELU = False, act_prec = None, nu = None, 
             dropped = tf.contrib.nn.alpha_dropout( cnn, 0.95 )
             cnn = tf.where( training, dropped, cnn )
     else:
-        dense_1 = tf.get_variable( "dense_8", [ cnn.get_shape()[-1], no_filt[7] ] )
-        dense_2 = tf.get_variable( "dense_9", [ no_filt[7], no_filt[8] ] )
+        dense_1 = tf.compat.v1.get_variable( "dense_8", [ cnn.get_shape()[-1], no_filt[7] ] )
+        dense_2 = tf.compat.v1.get_variable( "dense_9", [ no_filt[7], no_filt[8] ] )
         tf.summary.histogram( "dense_1_fp", dense_1 )
         tf.summary.histogram( "dense_2_fp", dense_2 )
         dense_1 = q.trinarize( dense_1, nu = nu[7] )
         dense_2 = q.trinarize( dense_2, nu = nu[8] )
         tf.summary.histogram( "dense_1_tri", dense_1 )
         tf.summary.histogram( "dense_2_tri", dense_2 )
-        with tf.variable_scope("dense_1"):
+        with tf.compat.v1.variable_scope("dense_1"):
             cnn = tf.matmul( cnn, dense_1 )
             cnn = tf.layers.batch_normalization( cnn, training = training )
             if act_prec[7] is not None:
                 cnn = q.shaped_relu( cnn, act_prec[7] )
             else:
                 cnn = tf.nn.relu( cnn )
-        with tf.variable_scope("dense_2"):
+        with tf.compat.v1.variable_scope("dense_2"):
             cnn = tf.matmul( cnn, dense_2 )
             cnn = tf.layers.batch_normalization( cnn, training = training )
             if act_prec[8] is not None:
                 cnn = q.shaped_relu( cnn, act_prec[8] )
             else:
                 cnn = tf.nn.relu( cnn )
-    with tf.variable_scope("dense_3"):
+    with tf.compat.v1.variable_scope("dense_3"):
         pred = tf.layers.dense( cnn, no_filt[9], use_bias = False )
     return pred

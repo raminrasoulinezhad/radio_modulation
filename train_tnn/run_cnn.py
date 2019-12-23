@@ -50,7 +50,7 @@ def parse_example( ex, use_teacher = False ):
         ftrs["teacher"] = tf.FixedLenFeature( shape = [24], dtype = tf.float32 )
     parsed_ex = tf.io.parse_single_example( ex, ftrs )
     signal = tf.transpose( tf.reshape( parsed_ex["signal"], ( 2, 1024 ) ) )
-    label_char = tf.substr( parsed_ex["label"], 0, 1 )
+    label_char = tf.strings.substr( parsed_ex["label"], 0, 1 )
     label = tf.decode_raw( label_char, out_type=tf.uint8)
     label = tf.reshape( label, [] )
     snr = tf.reshape( parsed_ex["snr"], [] )
@@ -183,20 +183,18 @@ def print_conf_mat( preds, labels ):
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument( "--model_name", type = str, required = True,
-                         help="The model name to train or test")
     teacher = parser.add_mutually_exclusive_group()
     teacher.add_argument( "--teacher_name", type = str,
                           help="The resnet teacher model to train with")
     teacher.add_argument( "--teacher_dset", action='store_true',
                           help="Use teacher values in the dataset")
-    parser.add_argument( "--dataset", type = str, required = True,
+    parser.add_argument( "--dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_resnet_train.rcrd",
                          help = "The dataset to train or test on" )
-    parser.add_argument( "--val_dataset", type = str,
+    parser.add_argument( "--val_dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd",
                          help = "The dataset to validate on when training" )
     parser.add_argument( "--steps", type = int,
                          help = "The number of training steps" )
-    parser.add_argument( "--epochs", type = int, default = 2,
+    parser.add_argument( "--epochs", type = int, default = 1,
                          help = "The number of training epochs" )
     parser.add_argument( "--test", action = "store_true",
                          help = "Test the model on this dataset" )
@@ -210,22 +208,26 @@ def get_args():
                          help = "Batch size to use" )
     parser.add_argument( "--learning_rate", type=float, default = 0.01,
                          help = "The learning rate to use when training" )
-    group = parser.add_mutually_exclusive_group( required = True )
-    group.add_argument("--resnet", action='store_true', help = "Run resnet" )
-    group.add_argument("--resnet_twn", action='store_true', help = "Run resnet_twn" )
-    group.add_argument("--full_prec", action='store_true', help = "Run full precision VGG with SELU" )
-    group.add_argument("--twn", action='store_true', help = "Run Vgg with ternary weights" )
-    group.add_argument("--twn_binary_act", action='store_true', help = "Run Vgg with ternary weights and binary activations" )
-    group.add_argument("--twn_incr_act", type=int, help = "Run Vgg with ternary weights and incrementatal precision activations\nInput int the the number of bin act layers from the top, after that double each layer until >= 16\nWhen >= 16 switch to floating point\nWill binaraize the last conv layer and the dense layers" )
-    parser.add_argument( "--nu_conv", type=float,
-                         help = "The parameter to use when trinarizing the conv layers" )
-    parser.add_argument( "--nu_dense", type=float,
-                         help = "The parameter to use when trinarizing the dense layers" )
+    #group = parser.add_mutually_exclusive_group( required = True )
+
+    parser.add_argument( "--model", type = str, required = True, help="The model name to train or test")
+    
+    #group.add_argument("--resnet", action='store_true', help = "Run resnet")
+    #group.add_argument("--resnet_twn", action='store_true', help = "Run resnet_twn")
+    parser.add_argument("--norespath", action='store_true', help = "disconnect res paths")
+
+    #group.add_argument("--full_prec", action='store_true', help = "Run full precision VGG with SELU" )
+    #group.add_argument("--twn", action='store_true', help = "Run Vgg with ternary weights" )
+    #group.add_argument("--twn_binary_act", action='store_true', help = "Run Vgg with ternary weights and binary activations" )
+    parser.add_argument("--twn_incr_act", type=int, help = "Run Vgg with ternary weights and incrementatal precision activations\nInput int the the number of bin act layers from the top, after that double each layer until >= 16\nWhen >= 16 switch to floating point\nWill binaraize the last conv layer and the dense layers" )
+
+    parser.add_argument( "--nu_conv", type=float, help = "The parameter to use when trinarizing the conv layers" )
+    parser.add_argument( "--nu_dense", type=float, help = "The parameter to use when trinarizing the dense layers" )
+
     vgg_filt_grp = parser.add_mutually_exclusive_group()
-    vgg_filt_grp.add_argument( "--no_filt_vgg", type=int,
-                               help = "number of filters to use for vgg" )
-    vgg_filt_grp.add_argument( "--no_filts", type=str,
-                               help = "number of filters to use for vgg" )
+    vgg_filt_grp.add_argument( "--no_filt_vgg", type=int, help = "number of filters to use for vgg" )
+    vgg_filt_grp.add_argument( "--no_filts", type=str, help = "number of filters to use for vgg" )
+
     parser.add_argument( "--gpus", type=str, help = "GPUs to use" )
 
     parser.add_argument( "--channel", type=int, default=64, help="channel size" )
@@ -236,12 +238,22 @@ if __name__ == "__main__":
     args = get_args()
 
     # computing the required steps
+    print("****************************************")
     epoch_steps = 24*26*4100
     epoch_steps_train = math.ceil(epoch_steps*0.9)
     args.steps = epoch_steps_train*args.epochs
     print("Epochs: %d, each: %d steps" % (args.epochs, epoch_steps_train))
     print("Steps: %d" % (args.steps))
+    for arg in vars(args):
+        print (str(arg) + ": \t"+ str(getattr(args, arg)))
     
+    model_dir = "../models/" + args.model + "_ch" + str(args.channel)
+    if args.norespath and ("resnet" in args.model):
+        model_dir += "_norespath"
+
+    print ("directory: " + model_dir)
+    print("****************************************")
+
     iterator = batcher( args.dataset, args.batch_size, not args.test, args.teacher_dset )
     if args.gpus is not None:
         os.environ["CUDA_VISIBLE_DEVICES"]=args.gpus
@@ -271,33 +283,35 @@ if __name__ == "__main__":
     if args.no_filts is not None:
         no_filt = [ int(x) for x in args.no_filts.split(",") ]
 
-    if args.resnet:
+
+    if args.model == "resnet":
         with tf.variable_scope("teacher"):
             pred = resnet.get_net( signal, training=training, remove_mean = not args.no_mean )
-    if args.resnet_twn:
+    elif args.model == "resnet_twn":
         nu = [args.nu_conv]*6 + [args.nu_dense]*3
-        act_prec = [16]*9 	# quantize [0-1]
-        #act_prec = [None]*9 	
+        act_prec = [16]*9 	# quantize [0-1] #act_prec = [None]*9 	
         opt_ResBlock = True
         pred = resnet.get_net(signal, training=training, no_filt=args.channel, remove_mean=not args.no_mean, nu=nu, 
-        	act_prec=act_prec, opt_ResBlock=opt_ResBlock, n_stack=4, n_convs=2)
+        	act_prec=act_prec, opt_ResBlock=opt_ResBlock, n_stack=4, n_convs=2, respath=not(args.norespath))
 
-    elif args.full_prec:
+    elif args.model == "full_prec":
         pred = Vgg10.get_net( signal, training, use_SELU=True, act_prec = None, nu = None, no_filt = no_filt, remove_mean = not args.no_mean )
-    elif args.twn:
+    elif args.model == "twn":
         act_prec = [16]*9 	# quantize [0-1]
         pred = Vgg10.get_net( signal, training, use_SELU=False, act_prec = None, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
-    elif args.twn_binary_act:
+    elif args.model == "twn_binary_act":
         act_prec = [1]*9
         pred = Vgg10.get_net( signal, training, use_SELU=False, act_prec = act_prec, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
-    elif args.twn_incr_act is not None:
+    elif args.model == "twn_incr_act":
         # last conv and dense layers should be bin
         act_prec = [1]*args.twn_incr_act + [ 1 << ( i + 1 ) for i in range(6-args.twn_incr_act) ] + [1]*3
         act_prec = [ x if x < 16 else None for x in act_prec ]
         pred = Vgg10.get_net( signal, training, use_SELU = False, act_prec = act_prec, nu = nu, no_filt = no_filt, remove_mean = not args.no_mean )
     else:
-        tf.logging.log( tf.logging.ERROR, "Invalid arguments" )
+        tf.compat.v1.logging.log( tf.compat.v1.logging.ERROR, "Invalid arguments" )
         exit()
+
+
     if not args.test:
         pred_label = tf.cast( tf.math.argmax( pred, axis = 1 ), tf.int32 )
         num_correct = tf.reduce_sum( tf.cast( tf.math.equal( pred_label, label ), tf.float32 ) )
@@ -316,15 +330,15 @@ if __name__ == "__main__":
     with tf.compat.v1.Session() as sess:
         try:
             if not args.test:
-                smry_wrt = tf.compat.v1.summary.FileWriter( args.model_name + "_logs", sess.graph, session = sess )
+                smry_wrt = tf.compat.v1.summary.FileWriter( model_dir + "_logs", sess.graph, session = sess )
                 sess.run( iterator.initializer )
                 if do_val:
                     sess.run( test_iterator.initializer )
             sess.run( init_op )
             # load the model if possible
-            if tf.train.checkpoint_exists( args.model_name ):
+            if tf.train.checkpoint_exists( model_dir ):
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Loading model ... " )
-                saver.restore(sess, args.model_name )
+                saver.restore(sess, model_dir )
             if args.teacher_name is not None and tf.train.checkpoint_exists( args.teacher_name ):
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Loading teacher ... " )
                 resnet_saver.restore(sess, args.teacher_name )
@@ -338,4 +352,4 @@ if __name__ == "__main__":
         finally:
             if not args.test:
                 tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Saving model ... " )
-                saver.save( sess, args.model_name )
+                saver.save( sess, model_dir )
