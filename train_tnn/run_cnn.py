@@ -240,7 +240,7 @@ if __name__ == "__main__":
     for arg in vars(args):
         print (str(arg) + ": \t"+ str(getattr(args, arg)))
     
-    model_dir = "../models/" + args.model + "_StackConv" + str(args.lyr_conv) + "_StackFC" + str(args.lyr_fc) + "_ch" + str(args.conv_ch) + "_fc" + str(args.fc_ch)
+    model_dir = "../models/" + args.model + "_StackConv" + str(args.lyr_conv) + "_StackFC" + str(args.lyr_fc) + "_ch" + str(args.conv_ch) + "_fc" + str(args.fc_ch) + "_K1st" + str(args.k_1) + "_Kn" + str(args.k_n)
     if args.norespath and ("resnet" in args.model):
         model_dir += "_norespath"
 
