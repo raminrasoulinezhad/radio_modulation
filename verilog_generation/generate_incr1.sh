@@ -5,7 +5,7 @@ PREC=6
 BN_PREC=8
 SHIFT=$(( PREC + BN_PREC ))
 
-cd ../train_tnn
+cd train_tnn
 python3 extract_weights_from_vgg.py --model_name $MODEL_DIR
 python3 compute_vgg_with_csv.py --model_name $MODEL_DIR --nu_conv 1.2 --nu_dense 0.7 --prec $PREC \
  --bn_p $BN_PREC --wr_files --no_filts 128,128,128,128,128,128,128,512,512,24 --remove_mean --twn_incr_act 1
@@ -38,7 +38,7 @@ python3 generate_test_vecs.py --file_in $MODEL_DIR/pred_output.csv --file_out $M
 
 python3 generate_tw_vgg10.py --model_dir $MODEL_DIR --bws_in 16,1,1,1,1,1,1 --bws_out 16,16,16,16,16,1,1 -t n,p,p,p,p,s,s
 
-rsync -aP $MODEL_DIR/*_hex.sv ../verilog_test/tw_vgg_2iq_incr_test.sv tuna:~/rt_amc_models/incr1/sim/
+rsync -aP $MODEL_DIR/*_hex.sv ../verilog_test/tw_vgg_2iq_incr_test.sv ../rt_amc_models/incr1/sim/ #tuna:~/rt_amc_models/incr1/sim/
 rm $MODEL_DIR/*_hex.sv
-rsync -aP $MODEL_DIR/*.sv ../verilog/*.sv --exclude tw_vgg.sv --exclude tw_vgg_2iq_bin.sv --exclude tw_vgg_2iq_bin.sv tuna:~/rt_amc_models/incr1/srcs/
+rsync -aP $MODEL_DIR/*.sv ../verilog/*.sv --exclude tw_vgg.sv --exclude tw_vgg_2iq_bin.sv --exclude tw_vgg_2iq_bin.sv ../rt_amc_models/incr1/srcs/ #tuna:~/rt_amc_models/incr1/srcs/
 

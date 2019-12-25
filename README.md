@@ -90,7 +90,7 @@ To test the quantized performance on all models run
 
 install:
 	
-	pip3 install tensorflow-gpu==1.14 tqdm
+	pip3 install tensorflow-gpu==1.14 tqdm twn_generator scipy scikit-image
 
 tensorboard:
 

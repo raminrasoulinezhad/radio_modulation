@@ -1,5 +1,16 @@
 #! /bin/bash
 
+mkdir rt_amc_models
+
+mkdir rt_amc_models/bin64
+mkdir rt_amc_models/bin64_d512
+mkdir rt_amc_models/bin128
+mkdir rt_amc_models/f64
+mkdir rt_amc_models/f96
+mkdir rt_amc_models/f128
+mkdir rt_amc_models/incr1
+mkdir rt_amc_models/rfsoc
+
 verilog_generation/generate_bin64.sh
 verilog_generation/generate_bin64_d512.sh
 verilog_generation/generate_bin128.sh

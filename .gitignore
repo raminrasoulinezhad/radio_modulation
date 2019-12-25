@@ -107,3 +107,10 @@ venv.bak/
 .mypy_cache/
 
 models/ramin*
+
+models/vgg*/*.sv
+models/vgg*/*.c
+models/vgg*/*.h
+models/vgg*/*.csv
+
+rt_amc_models
