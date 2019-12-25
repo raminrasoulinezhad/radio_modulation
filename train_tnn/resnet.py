@@ -35,7 +35,7 @@ def dense_batch_selu_drop_relu(x, training=False, no_filt=128, nu=None, act_prec
 		cnn = q.quant(cnn, act_prec, shift=not(relu_en))
 	return cnn
 
-def conv_batch_relu(x, training=False, no_filt=128, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False, pool_en=False, bn_en=True, relu_en=True):
+def conv_batch_relu(x, training=False, no_filt=64, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False, pool_en=False, bn_en=True, relu_en=True):
 	if nu is None:
 		cnn = tf.layers.conv1d(x, no_filt, kernel, padding=padding, use_bias=use_bias)
 	else:
@@ -85,9 +85,7 @@ def residual_stack(x, no_filt, training=False, nu=None, act_prec=None, kernel=3,
 	cnn = tf.layers.max_pooling1d( cnn, 2, 2 )
 	return cnn
 
-def get_net(x, training = False, no_filt=64, remove_mean=True, nu=None, act_prec=None, kernel=3, opt_ResBlock=False, n_stack=6, n_convs=3, respath=True):
-	
-	kernel = [kernel] * (6+3)
+def get_net(x, training = False, no_filt=64, remove_mean=True, nu=None, act_prec=None, kernel=3, opt_ResBlock=False, n_stack_cnv=4, n_stack_fc=3, n_convs=3, respath=True):
 
 	print("nu: %s, \nact_prec: %s, \nkernel: %s" % (str(nu),str(act_prec),str(kernel)))
 	print (respath)
@@ -95,19 +93,17 @@ def get_net(x, training = False, no_filt=64, remove_mean=True, nu=None, act_prec
 	# remove the bias from all examples and make
 	cnn = remover_mean(x, remove_mean)
 
-	for i in range(n_stack):
+	for i in range(n_stack_cnv):
 		with tf.compat.v1.variable_scope("ResStack_"+str(i)):
 			cnn = residual_stack(cnn, no_filt, training=training, nu=nu[i], act_prec=act_prec[i], kernel=kernel[i], opt_ResBlock=opt_ResBlock, n_convs=n_convs, respath=respath)	
 
 	cnn = tf.compat.v1.layers.flatten(cnn)
 
-	with tf.variable_scope("dense_0"):
-		cnn = dense_batch_selu_drop_relu(cnn, training=training, no_filt=128, nu=nu[6], act_prec=act_prec[6])
+	for i in range(n_stack_fc):
+		with tf.compat.v1.variable_scope("DenseStack_"+str(i)):
+			if i == (n_stack_fc - 1):
+				cnn = tf.layers.dense(cnn, kernel[n_stack_cnv+i])
+			else:
+				cnn = dense_batch_selu_drop_relu(cnn, training=training, no_filt=kernel[n_stack_cnv+i], nu=nu[n_stack_cnv+i], act_prec=act_prec[n_stack_cnv+i])
 
-	with tf.variable_scope("dense_1"):
-		cnn = dense_batch_selu_drop_relu(cnn, training=training, no_filt=128, nu=nu[7], act_prec=act_prec[7])
-
-	with tf.variable_scope("dense_2"):
-		pred = tf.layers.dense(cnn, 24)
-
-	return pred
+	return cnn
