@@ -34,7 +34,8 @@ module windower
 	localparam state_run = 2'b01;
 	localparam state_autorun = 2'b10;
 	
-	integer i,j;
+	integer i;
+	integer j;
 
 	reg [NO_CH-1:0] window_mem [WINDOW-1:0];
 	reg [LOG2_IMG_SIZE-L2_TPUT-1:0] cntr;
@@ -43,7 +44,7 @@ module windower
 
 	// implement padding
 	reg [NO_CH-1:0] zero [THROUGHPUT-1:0];
-	always @(*)begin
+	always_comb begin
 		for (j = 0; j < THROUGHPUT; j = j + 1) begin
 			zero[j] = 0;
 		end
@@ -55,10 +56,10 @@ module windower
 				window_mem[i] <= 0;
 			end
 		end else if (vld_in && ((state == state_wait)|| (state == state_run))) begin
-			window_mem[THROUGHPUT-1:0] <= zero[THROUGHPUT-1:0];
+			window_mem[THROUGHPUT-1:0] <= data_in[THROUGHPUT-1:0];
 			window_mem[WINDOW-1:THROUGHPUT] <= window_mem[WINDOW-1-THROUGHPUT:0];
 		end else if (state == state_autorun) begin
-			window_mem[THROUGHPUT-1:0] <= {{}}data_in[THROUGHPUT-1:0];
+			window_mem[THROUGHPUT-1:0] <= zero[THROUGHPUT-1:0];
 			window_mem[WINDOW-1:THROUGHPUT] <= window_mem[WINDOW-1-THROUGHPUT:0];
 		end
 	end
