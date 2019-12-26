@@ -107,6 +107,7 @@ venv.bak/
 .mypy_cache/
 
 models/ramin*
+models/resnet_twn*
 
 models/vgg*/*.sv
 models/vgg*/*.c
