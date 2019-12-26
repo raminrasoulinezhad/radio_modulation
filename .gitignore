@@ -115,3 +115,4 @@ models/vgg*/*.h
 models/vgg*/*.csv
 
 rt_amc_models
+ModelSim/
