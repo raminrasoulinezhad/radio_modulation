@@ -22,7 +22,7 @@ module windower
 	input [NO_CH-1:0] data_in [THROUGHPUT-1:0],
 
 	output logic vld_out,
-	output logic [NO_CH-1:0] data_out [THROUGHPUT+1:0]
+	output logic [NO_CH-1:0] data_out [WINDOW-1:0]
 );
 	localparam NO_MEM = 2 * THROUGHPUT;
 	localparam L2_TPUT = $clog2(THROUGHPUT);
@@ -39,7 +39,7 @@ module windower
 
 	reg [NO_CH-1:0] window_mem [WINDOW-1:0];
 	reg [LOG2_IMG_SIZE-L2_TPUT-1:0] cntr;
-	reg [L2_PAD-1:0] remaining;
+	reg [L2_PAD:0] remaining;
 	reg [1:0] state;
 
 	// implement padding
@@ -59,8 +59,13 @@ module windower
 			window_mem[THROUGHPUT-1:0] <= data_in[THROUGHPUT-1:0];
 			window_mem[WINDOW-1:THROUGHPUT] <= window_mem[WINDOW-1-THROUGHPUT:0];
 		end else if (state == state_autorun) begin
-			window_mem[THROUGHPUT-1:0] <= zero[THROUGHPUT-1:0];
-			window_mem[WINDOW-1:THROUGHPUT] <= window_mem[WINDOW-1-THROUGHPUT:0];
+			if (remaining != 0) begin
+				window_mem[THROUGHPUT-1:0] <= zero[THROUGHPUT-1:0];
+				window_mem[WINDOW-1:THROUGHPUT] <= window_mem[WINDOW-1-THROUGHPUT:0];		
+			end else if (vld_in) begin  
+				window_mem[THROUGHPUT-1:0] <= data_in[THROUGHPUT-1:0];
+				window_mem[WINDOW-1:THROUGHPUT] <= window_mem[WINDOW-1-THROUGHPUT:0];
+			end
 		end
 	end
 
@@ -94,7 +99,11 @@ module windower
 					vld_out <= 0;
 					state <= state_wait;
 					cntr <= 0;
-					remaining <= PAD;
+					if (vld_in) begin
+						remaining <= PAD - 1;
+					end else begin
+						remaining <= PAD;
+					end
 				end
 			end else if (state == state_wait) begin 
 				if (vld_in) begin

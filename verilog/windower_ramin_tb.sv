@@ -2,10 +2,13 @@
 module windower_tb();
 
 	parameter NO_CH = 16;
-	parameter LOG2_IMG_SIZE = 10;
+	parameter LOG2_IMG_SIZE = 6;
 	parameter THROUGHPUT = 1;
-	parameter WINDOW = 3;
-	parameter PADDDING = 1 ;
+	parameter WINDOW = 5;
+	parameter PADDDING = 1;
+
+	parameter clk_p = 1.0;
+	parameter clk_p2= clk_p/2;
 
 	reg clk;
 	reg rst;
@@ -14,41 +17,46 @@ module windower_tb();
 	reg [NO_CH-1:0] data_in [THROUGHPUT-1:0];
 
 	wire vld_out;
-	wire [NO_CH-1:0] data_out [THROUGHPUT+1:0];
+	wire [NO_CH-1:0] data_out [WINDOW-1:0];
 	
 	integer i;
+	reg [NO_CH-1:0] count;
 
 	initial begin 
 		clk = 0;
 		forever begin
-			#0.5 clk= !clk;
+			#clk_p2 clk= !clk;
 		end
 	end 
 	initial begin
+
 		rst = 1;
 		vld_in = 0;
+		count = 1024;
 
-		#10 rst = 0;
-		for (i = 0; i < THROUGHPUT; i = i + 1)begin
-			data_in[i] = $urandom;
+		repeat (2)  @(posedge clk) 
+		rst = 0;
+		
+		repeat (2)  @(posedge clk) 
+		rst = 0;
+
+		repeat (2**LOG2_IMG_SIZE) begin 
+			@(posedge clk) begin
+				for (i = 0; i < THROUGHPUT; i = i + 1)begin
+					data_in[i] = count;
+					count = count + 1;
+				end
+				#clk_p2 vld_in = 1;
+			end
 		end
-		#10 vld_in = 1; 
-		@(posedge clk)
-		for (i = 0; i < THROUGHPUT; i = i + 1)begin
-			data_in[i] = $urandom;
-		end
-		@(posedge clk)
-		for (i = 0; i < THROUGHPUT; i = i + 1)begin
-			data_in[i] = $urandom;
-		end
-		@(posedge clk)
-		for (i = 0; i < THROUGHPUT; i = i + 1)begin
-			data_in[i] = $urandom;
-		end
-		@(posedge clk)
-		for (i = 0; i < THROUGHPUT; i = i + 1)begin
-			data_in[i] = $urandom;
-		end
+
+		@(posedge clk) #clk_p2 vld_in = 0;
+
+		repeat (10)  begin
+			@(posedge clk)
+			#clk_p2 vld_in = 0;
+		end 
+		$stop;
 
 	end
 
