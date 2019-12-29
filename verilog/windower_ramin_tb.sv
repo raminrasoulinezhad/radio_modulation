@@ -1,10 +1,10 @@
 `timescale 1ns/1ps
-module windower_tb();
+module windower_ramin_tb();
 
 	parameter NO_CH = 16;
 	parameter LOG2_IMG_SIZE = 6;
 	parameter THROUGHPUT = 1;
-	parameter WINDOW = 5;
+	parameter WINDOW = 3;
 	parameter PADDDING = 1;
 
 	parameter clk_p = 1.0;
@@ -60,7 +60,7 @@ module windower_tb();
 
 	end
 
-	windower #(
+	windower_ramin #(
 		NO_CH,
 		LOG2_IMG_SIZE,
 		THROUGHPUT,

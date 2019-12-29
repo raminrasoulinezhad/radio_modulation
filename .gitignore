@@ -106,6 +106,9 @@ venv.bak/
 # mypy
 .mypy_cache/
 
+
+
+#modes
 models/ramin*
 models/resnet_twn*
 
@@ -115,4 +118,7 @@ models/vgg*/*.h
 models/vgg*/*.csv
 
 rt_amc_models
+
 ModelSim/
+Vivado_test/
+

@@ -3,7 +3,10 @@
 //	be sent for 2^(LOG2_IMG_SIZE) cycles This windower is used to produce multiple convolutional 
 //	windows depending on the THROUGHPUT 
 
-module windower
+// important notes:
+//		it can not tolerate new input during autorun state. 
+
+module windower_ramin
 #(
 	parameter NO_CH = 2,
 	parameter LOG2_IMG_SIZE = 10,
@@ -79,7 +82,7 @@ module windower
 			vld_out <= 0;
 		end
 		else begin
-			if (state == state_run) begin
+			unique if (state == state_run) begin
 				if (vld_in)begin
 					vld_out <= 1;
 					if (cntr == (CNTR_MAX-PAD-2)) begin
@@ -115,13 +118,13 @@ module windower
 						remaining <= remaining - 1;
 					end
 				end
-			end else begin
+			end /*else begin
 				// it should be as same as reset
 				cntr <= 0;			
 				state <= state_wait;
 				remaining <= PAD;
 				vld_out <= 0;
-			end
+			end */
 
 		end
 	end
