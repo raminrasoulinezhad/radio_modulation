@@ -111,3 +111,47 @@ def to_serial(R, NO_CH=10, BW_IN=8, BW_OUT=2, level=1):
 	
 	return R + [LUT, FF, BRAM, DSP]
 
+
+def serial_adder(R, BW=16, level=1):
+
+	LUT = BW  		# adder
+	LUT += 1		# logic of carry
+
+	FF = BW 		# data_out_reg
+	FF += 1			# carry_reg
+
+	BRAM = 0
+	DSP = 0
+	
+	return R + [LUT, FF, BRAM, DSP]
+
+
+def popcount_accumulate ():
+	raise Exception "it is not implemented"
+
+
+def pipelined_accumulator (R, IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
+
+	return R + Pipelined_ACC (IN_BITWIDTH=IN_BITWIDTH, OUT_BITWIDTH=OUT_BITWIDTH, LOG2_NO_IN=LOG2_NO_IN)
+
+def Pipelined_ACC (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
+
+	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
+
+	if LOG2_NO_IN <= 0:
+
+	else:
+
+		LUT = 0
+		if level > 0:
+			LUT += 0
+
+		FF = LOG2_NO_IN * INCR_BW			# intermediate_results
+		if level > 0:	
+			FF += 0
+
+		BRAM = 0
+		DSP = 0
+
+	return R + [LUT, FF, BRAM, DSP]
+

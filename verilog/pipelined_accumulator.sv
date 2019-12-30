@@ -7,8 +7,10 @@ module pipelined_accumulator
 	parameter LOG2_NO_IN = 1
 ) (
 	input clk,
+
 	input new_sum,
 	input signed [LOG2_NO_IN:0][IN_BITWIDTH-1:0] data_in,
+	
 	output signed [OUT_BITWIDTH-1:0] data_out
 );
 
