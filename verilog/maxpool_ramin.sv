@@ -4,29 +4,32 @@
  It can take a serial input with least significant word first as input
  */
 
-module maxpool
+module maxpool_ramin
 #(
 	parameter NO_CH = 10,
+	// "BW_IN" sjould be dividable by "SER_BW"
 	parameter BW_IN = 12,
 	parameter SER_BW = 4
 ) (
 	input clk,
 	input rst,
+
 	input vld_in,
 	input [NO_CH-1:0][SER_BW-1:0] data_in,
+
 	output vld_out,
 	output [NO_CH-1:0][BW_IN-1:0] data_out
 );
 	// compute how many cycles needed for a compare
-	localparam integer BUF_CYC = 1 << (1 + $clog2(BW_IN) - $clog2(SER_BW) ); 	
-	localparam integer DATA_SIZE = (BUF_CYC*SER_BW) >> 1;						
-	localparam integer BUF_SIZE = BUF_CYC*SER_BW;								
-	localparam integer CNTR_SIZE = $clog2( BUF_CYC );							
+	localparam BUF_CYC = 2 * (BW_IN / SER_BW);			
+	localparam DATA_SIZE = BW_IN;							
+	localparam BUF_SIZE = 2 * BW_IN;					
+	localparam CNTR_SIZE = $clog2( BUF_CYC );				
 	localparam LATENCY = 3;
 	
-	reg [NO_CH-1:0][BUF_SIZE-1:0]  input_buffer;
-	reg [NO_CH-1:0]		  max_flag;
-	reg [NO_CH-1:0][BW_IN-1:0] 	  max_x;
+	reg [NO_CH-1:0][BUF_SIZE-1:0] input_buffer;
+	reg [NO_CH-1:0] max_flag;
+	reg [NO_CH-1:0][BW_IN-1:0] max_x;
 	
 	// need to wait until all valids from serial
 	reg [CNTR_SIZE:0] cntr_vld;
@@ -41,7 +44,7 @@ module maxpool
 			reg [BUF_SIZE-1:0]  dly;
 			always @( posedge clk ) begin
 				if ( vld_in ) begin
-					if ( SER_BW == 2*BW_IN ) begin		
+					if ( SER_BW == 2*BW_IN ) begin		// it is not clear to me
 						input_buffer[i] <= data_in[i];
 					end else begin
 						input_buffer[i] <= {data_in[i], input_buffer[i][(BUF_SIZE-1):SER_BW]};
