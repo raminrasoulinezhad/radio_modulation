@@ -130,6 +130,20 @@ def popcount_accumulate ():
 	raise Exception "it is not implemented"
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 def pipelined_accumulator (R, IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
 	return R + Pipelined_ACC (IN_BITWIDTH=IN_BITWIDTH, OUT_BITWIDTH=OUT_BITWIDTH, LOG2_NO_IN=LOG2_NO_IN)
@@ -146,12 +160,14 @@ def Pipelined_ACC (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 		if level > 0:
 			LUT += 0
 
-		FF = LOG2_NO_IN * INCR_BW			# intermediate_results
+		FF = LOG2_NO_IN * INCR_BW	# intermediate_results
 		if level > 0:	
-			FF += 0
+			FF += 1					# new_sum_reg
 
 		BRAM = 0
 		DSP = 0
 
-	return R + [LUT, FF, BRAM, DSP]
+		return Pipelined_ACC (IN_BITWIDTH=INCR_BW, 
+			OUT_BITWIDTH=OUT_BITWIDTH, 
+			LOG2_NO_IN=LOG2_NO_IN-1) + [LUT, FF, BRAM, DSP] 
 

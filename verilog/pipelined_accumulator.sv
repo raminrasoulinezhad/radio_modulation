@@ -10,7 +10,8 @@ module pipelined_accumulator
 
 	input new_sum,
 	input signed [LOG2_NO_IN:0][IN_BITWIDTH-1:0] data_in,
-	
+	////input signed [(1<<LOG2_NO_IN)-1:0][IN_BITWIDTH-1:0] data_in
+
 	output signed [OUT_BITWIDTH-1:0] data_out
 );
 
@@ -45,6 +46,13 @@ module pipelined_accumulator
 					intermediate_results[i] <= $signed(data_in[i]) + $signed(data_in[i+1]);
 				end
 			end
+			
+			////reg signed  [(1<<(LOG2_NO_IN-1))-1:0][INCR_BW-1:0] intermediate_results;
+			////for ( i = 0; i < ( 1 << (LOG2_NO_IN-1) ); i = i + 1  ) begin
+			////	always @( posedge clk ) begin
+			////		intermediate_results[i] <= $signed(data_in[2*i]) + $signed(data_in[(2*i)+1]);
+			////	end
+			////end
 			
 			reg new_sum_reg;
 			always @( posedge clk ) begin
