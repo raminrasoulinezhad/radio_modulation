@@ -131,8 +131,9 @@ def popcount_accumulate ():
 
 def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
-	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
-	#INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else OUT_BITWIDTH
+	#INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
+	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else OUT_BITWIDTH
+	
 	NO_IN = 2 ** LOG2_NO_IN
 
 	if LOG2_NO_IN <= 0:
@@ -147,7 +148,7 @@ def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
 	else:
 
-		LUT = (NO_IN // 2) * (IN_BITWIDTH) 	# signed adder
+		LUT = (NO_IN // 2) * INCR_BW 	# signed adder
 
 		FF = (NO_IN // 2) * INCR_BW		# intermediate_results
 		FF += 1							# new_sum_reg
@@ -158,17 +159,30 @@ def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 		return np.array([LUT, FF, BRAM, DSP]) + pipelined_accumulator (IN_BITWIDTH=INCR_BW, 
 			OUT_BITWIDTH=OUT_BITWIDTH, LOG2_NO_IN=LOG2_NO_IN-1)
 
-def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16 ,BW_OUT=16 ,BW_W=2, R_SHIFT=0, DEBUG_FLAG=0, USE_UNSIGNED_DATA=0, NUM_CYC=32):
-	
-	BW_E = R_SHIFT if (R_SHIFT > BW_W) else BW_W
+def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2, 
+	R_SHIFT=0, DEBUG_FLAG=0, USE_UNSIGNED_DATA=0, NUM_CYC=32, full_precision=True):
+	# This number is designed for full precision
+	# The reported number is the maximum resource usage
+	#	full_precision = True --> maximum
+
 	NO_VECS = 2 ** LOG2_NO_VECS
 
-	LUT = 16 * NO_VECS 				# multipliers
+	LOG2_NUM_CYC = int(np.ceil(np.log2(NUM_CYC)))
+	PACC_IN_BW = BW_W + BW_IN
 
-	FF = NO_VECS * (BW_W + BW_IN)	# mult_res
+	if full_precision:
+		PACC_OUT_BW = PACC_IN_BW + LOG2_NUM_CYC + LOG2_NO_VECS	#ideal
+	else:
+		#BW_E = R_SHIFT if (R_SHIFT > BW_W) else BW_W
+		#PACC_OUT_BW = BW_E + BW_OUT 							#old
+		PACC_OUT_BW = R_SHIFT + BW_OUT
+
+	LUT = NO_VECS * 17 				# multipliers
+
+	FF = NO_VECS * PACC_IN_BW		# mult_res
 	FF += 1 						# new_sum_reg
 
 	BRAM = 0
 	DSP = 0
 
-	return np.array([LUT, FF, BRAM, DSP]) , pipelined_accumulator(IN_BITWIDTH=(BW_W+BW_IN), OUT_BITWIDTH=(BW_E+BW_OUT), LOG2_NO_IN=LOG2_NO_VECS)
+	return np.array([LUT, FF, BRAM, DSP]) + pipelined_accumulator(IN_BITWIDTH=(BW_W+BW_IN), OUT_BITWIDTH=PACC_OUT_BW, LOG2_NO_IN=LOG2_NO_VECS)
