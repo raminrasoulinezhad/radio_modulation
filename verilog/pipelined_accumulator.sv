@@ -1,58 +1,48 @@
 `timescale 1ns / 1ps
 
+// IMPORTANT Note about parameter section: 
+
 module pipelined_accumulator
 #(
 	parameter IN_BITWIDTH = 8,
+	// OUT_BITWIDTH = IN_BITWIDTH + LOG2_NO_IN + loops_of_MAC
 	parameter OUT_BITWIDTH = 10,
 	parameter LOG2_NO_IN = 1
 ) (
 	input clk,
 
 	input new_sum,
-	input signed [LOG2_NO_IN:0][IN_BITWIDTH-1:0] data_in,
-	////input signed [(1<<LOG2_NO_IN)-1:0][IN_BITWIDTH-1:0] data_in
+	input signed [(1<<LOG2_NO_IN)-1:0][IN_BITWIDTH-1:0] data_in,
 
 	output signed [OUT_BITWIDTH-1:0] data_out
 );
 
-	localparam INCR_BW = ( IN_BITWIDTH < OUT_BITWIDTH ) ? IN_BITWIDTH + 1 : IN_BITWIDTH;
+	localparam INCR_BW = (IN_BITWIDTH<OUT_BITWIDTH) ?  IN_BITWIDTH + 1  :  IN_BITWIDTH;
+	localparam NO_IN = 1 << LOG2_NO_IN;
 
 	genvar i;
 	generate
-		if ( LOG2_NO_IN <= 0 ) begin
+		if (LOG2_NO_IN <= 0) begin
 
 			reg signed [OUT_BITWIDTH-1:0] data_out_reg;
-			wire signed [OUT_BITWIDTH-1:0] zero;
-
-			assign zero = 0;
-			assign data_out = data_out_reg;
-
 			always @( posedge clk ) begin
 	   			if ( new_sum ) begin
-	   				//////////////////////////////////////////////////////////////////////////////////////////
-	   				// Ramin: Why registering when ther eis no computation here.
-	   				//	So we can by pass the computation 
-					data_out_reg <= $signed( data_in[0] ) + zero;
+					data_out_reg <= $signed( data_in[0] ) + $signed( 0 );
 				end else begin
 					data_out_reg <= $signed( data_in[0] ) + $signed( data_out_reg );
 				end
 			end
 
+			assign data_out = data_out_reg;
+
 		end else begin
-			
-			reg signed  [LOG2_NO_IN-1:0][INCR_BW-1:0] intermediate_results;
-			for ( i = 0; i < ( 1 << LOG2_NO_IN ); i = i + 2  ) begin
+
+			reg signed [(NO_IN/2)-1:0][INCR_BW-1:0] intermediate_results;
+			for (i = 0; i < (NO_IN/2); i = i + 1) begin
 				always @( posedge clk ) begin
-					intermediate_results[i] <= $signed(data_in[i]) + $signed(data_in[i+1]);
+					intermediate_results[i] <= $signed(data_in[2*i]) + $signed(data_in[(2*i)+1]);
 				end
 			end
-			
-			////reg signed  [(1<<(LOG2_NO_IN-1))-1:0][INCR_BW-1:0] intermediate_results;
-			////for ( i = 0; i < ( 1 << (LOG2_NO_IN-1) ); i = i + 1  ) begin
-			////	always @( posedge clk ) begin
-			////		intermediate_results[i] <= $signed(data_in[2*i]) + $signed(data_in[(2*i)+1]);
-			////	end
-			////end
 			
 			reg new_sum_reg;
 			always @( posedge clk ) begin

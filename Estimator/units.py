@@ -1,6 +1,6 @@
 import numpy as np
 
-def windower_ramin(R, WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, 
+def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, 
 	THROUGHPUT=1, PADDDING=True, level=1):
 	
 	L2_TPUT = int(np.ceil(np.log2(THROUGHPUT)))
@@ -22,9 +22,9 @@ def windower_ramin(R, WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10,
 	BRAM = 0
 	DSP = 0
 	
-	return R + [LUT, FF, BRAM, DSP]
+	return np.array([LUT, FF, BRAM, DSP])
 	
-def bn(R, NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, 
+def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, 
 	R_SHIFT=6, MAXVAL=-1, level=1):
 
 	BITS_MAX = R_SHIFT if ( R_SHIFT > BW_A ) else BW_A;
@@ -49,9 +49,9 @@ def bn(R, NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12,
 	BRAM = 0
 	DSP = NO_CH
 	
-	return R + [LUT, FF, BRAM, DSP]
+	return np.array([LUT, FF, BRAM, DSP])
 
-def from_serial(R, NO_CH=10, BW_IN=2, BW_OUT=8, level=1):
+def from_serial(NO_CH=10, BW_IN=2, BW_OUT=8, level=1):
 
 	NO_CYC = int(np.ceil(BW_OUT/BW_IN))
 	CNTR_BW = int(np.log2(NO_CYC))
@@ -66,9 +66,9 @@ def from_serial(R, NO_CH=10, BW_IN=2, BW_OUT=8, level=1):
 	BRAM = 0
 	DSP = 0
 	
-	return R + [LUT, FF, BRAM, DSP]
+	return np.array([LUT, FF, BRAM, DSP])
 
-def maxpool_ramin(R, NO_CH=10, BW_IN=12, SER_BW=4, level=1):
+def maxpool_ramin(NO_CH=10, BW_IN=12, SER_BW=4, level=1):
 
 	BUF_CYC = 2 * (BW_IN / SER_BW)			
 	DATA_SIZE = BW_IN						
@@ -91,10 +91,10 @@ def maxpool_ramin(R, NO_CH=10, BW_IN=12, SER_BW=4, level=1):
 	BRAM = 0
 	DSP = 0
 	
-	return R + [LUT, FF, BRAM, DSP]
+	return np.array([LUT, FF, BRAM, DSP])
 
 
-def to_serial(R, NO_CH=10, BW_IN=8, BW_OUT=2, level=1):
+def to_serial(NO_CH=10, BW_IN=8, BW_OUT=2, level=1):
 
 	NO_CYC = int(np.ceil(BW_IN/BW_OUT))
 
@@ -109,10 +109,10 @@ def to_serial(R, NO_CH=10, BW_IN=8, BW_OUT=2, level=1):
 	BRAM = 0
 	DSP = 0
 	
-	return R + [LUT, FF, BRAM, DSP]
+	return np.array([LUT, FF, BRAM, DSP])
 
 
-def serial_adder(R, BW=16, level=1):
+def serial_adder(BW=16, level=1):
 
 	LUT = BW  		# adder
 	LUT += 1		# logic of carry
@@ -123,51 +123,52 @@ def serial_adder(R, BW=16, level=1):
 	BRAM = 0
 	DSP = 0
 	
-	return R + [LUT, FF, BRAM, DSP]
+	return np.array([LUT, FF, BRAM, DSP])
 
 
 def popcount_accumulate ():
-	raise Exception "it is not implemented"
+	raise Exception ("it is not implemented")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def pipelined_accumulator (R, IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
-
-	return R + Pipelined_ACC (IN_BITWIDTH=IN_BITWIDTH, OUT_BITWIDTH=OUT_BITWIDTH, LOG2_NO_IN=LOG2_NO_IN)
-
-def Pipelined_ACC (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
+def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
 	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
+	#INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else OUT_BITWIDTH
+	NO_IN = 2 ** LOG2_NO_IN
 
 	if LOG2_NO_IN <= 0:
 
-	else:
-
-		LUT = 0
-		if level > 0:
-			LUT += 0
-
-		FF = LOG2_NO_IN * INCR_BW	# intermediate_results
-		if level > 0:	
-			FF += 1					# new_sum_reg
+		LUT = OUT_BITWIDTH		# adder & mux
+		FF = OUT_BITWIDTH		# data_out_reg
 
 		BRAM = 0
 		DSP = 0
 
-		return Pipelined_ACC (IN_BITWIDTH=INCR_BW, 
-			OUT_BITWIDTH=OUT_BITWIDTH, 
-			LOG2_NO_IN=LOG2_NO_IN-1) + [LUT, FF, BRAM, DSP] 
+		return np.array([LUT, FF, BRAM, DSP])
 
+	else:
+
+		LUT = (NO_IN // 2) * (IN_BITWIDTH) 	# signed adder
+
+		FF = (NO_IN // 2) * INCR_BW		# intermediate_results
+		FF += 1							# new_sum_reg
+
+		BRAM = 0
+		DSP = 0
+
+		return np.array([LUT, FF, BRAM, DSP]) + pipelined_accumulator (IN_BITWIDTH=INCR_BW, 
+			OUT_BITWIDTH=OUT_BITWIDTH, LOG2_NO_IN=LOG2_NO_IN-1)
+
+def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16 ,BW_OUT=16 ,BW_W=2, R_SHIFT=0, DEBUG_FLAG=0, USE_UNSIGNED_DATA=0, NUM_CYC=32):
+	
+	BW_E = R_SHIFT if (R_SHIFT > BW_W) else BW_W
+	NO_VECS = 2 ** LOG2_NO_VECS
+
+	LUT = 16 * NO_VECS 				# multipliers
+
+	FF = NO_VECS * (BW_W + BW_IN)	# mult_res
+	FF += 1 						# new_sum_reg
+
+	BRAM = 0
+	DSP = 0
+
+	return np.array([LUT, FF, BRAM, DSP]) , pipelined_accumulator(IN_BITWIDTH=(BW_W+BW_IN), OUT_BITWIDTH=(BW_E+BW_OUT), LOG2_NO_IN=LOG2_NO_VECS)
