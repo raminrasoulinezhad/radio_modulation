@@ -8,7 +8,7 @@ module mul_ss(
 	c
 );
 	parameter a_s = 16;
-	parameter b_s = 2;
+	parameter b_s = 8;
 	input clk;
 
 	input signed [a_s-1:0] a;
