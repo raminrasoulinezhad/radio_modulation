@@ -23,8 +23,17 @@ if __name__ == "__main__":
 	#R += to_serial(NO_CH=10, BW_IN=8, BW_OUT=2, level=1)
 	#R += serial_adder(BW=16, level=1)
 	#R += pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1)
-	R += multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, 
-		BW_W=2, R_SHIFT=0, DEBUG_FLAG=0, USE_UNSIGNED_DATA=0, NUM_CYC=32)
+	#R += multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2, R_SHIFT=0, USE_UNSIGNED_DATA=0, NUM_CYC=32)
+																
 
-	logger(R, R_max)
+	#R += dense_layer_fp (INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
 	
+	#R = dense_layer_fp (INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=4, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
+	#logger(R, R_max)
+	#R = dense_layer_fp (INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=29, BW_W=4, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
+	#logger(R, R_max)
+	#R = dense_layer_fp (INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=29, BW_W=2, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
+	#logger(R, R_max)
+	
+	REG, ADD = Conv_estimator()
+	print (REG, ADD)

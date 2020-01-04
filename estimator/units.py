@@ -1,4 +1,21 @@
 import numpy as np
+import warnings
+import re
+
+def multiplier_cost (a, b):
+	LUT = 0
+	DSP = 0
+
+	if ((a==16)&(b==2)):
+		LUT += 17 			
+	elif ((a==16)&(b==4)):
+		LUT += 57
+	elif ((a==16)&(b > 8)):
+		DSP += 1
+	else:	
+		raise Exception("BW_IN=%d & BW_W=%d are not supported" % (BW_IN,BW_W))
+
+	return np.array([LUT, 0, 0, DSP])
 
 def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, 
 	THROUGHPUT=1, PADDDING=True, level=1):
@@ -131,14 +148,16 @@ def popcount_accumulate ():
 
 def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
+	warnings.warn("Warning: Inaccurate result (pipelined_accumulator)")
+
 	#INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
 	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else OUT_BITWIDTH
 	
 	NO_IN = 2 ** LOG2_NO_IN
 
-	if LOG2_NO_IN <= 0:
+	if LOG2_NO_IN == 0:
 
-		LUT = OUT_BITWIDTH		# adder & mux
+		LUT = 2*OUT_BITWIDTH		# adder & mux
 		FF = OUT_BITWIDTH		# data_out_reg
 
 		BRAM = 0
@@ -148,9 +167,9 @@ def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
 	else:
 
-		LUT = (NO_IN // 2) * INCR_BW 	# signed adder
+		LUT = int(NO_IN / 2) * INCR_BW 	# signed adder
 
-		FF = (NO_IN // 2) * INCR_BW		# intermediate_results
+		FF = int(NO_IN / 2) * INCR_BW		# intermediate_results
 		FF += 1							# new_sum_reg
 
 		BRAM = 0
@@ -160,7 +179,10 @@ def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 			OUT_BITWIDTH=OUT_BITWIDTH, LOG2_NO_IN=LOG2_NO_IN-1)
 
 def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2, 
-	R_SHIFT=0, DEBUG_FLAG=0, USE_UNSIGNED_DATA=0, NUM_CYC=32, full_precision=True):
+	R_SHIFT=0, USE_UNSIGNED_DATA=0, NUM_CYC=32, full_precision=True):
+
+	warnings.warn("Warning: Inaccurate result (multiply_accumulate_fp)")
+
 	# This number is designed for full precision
 	# The reported number is the maximum resource usage
 	#	full_precision = True --> maximum
@@ -177,12 +199,84 @@ def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2,
 		#PACC_OUT_BW = BW_E + BW_OUT 							#old
 		PACC_OUT_BW = R_SHIFT + BW_OUT
 
-	LUT = NO_VECS * 17 				# multipliers
+	# multipliers
+	temp = multiplier_cost (BW_IN, BW_W)
+
+	LUT = NO_VECS * temp[0]
+	DSP = NO_VECS * temp[3]
 
 	FF = NO_VECS * PACC_IN_BW		# mult_res
 	FF += 1 						# new_sum_reg
 
 	BRAM = 0
+
+	return np.array([LUT, FF, BRAM, DSP]) + pipelined_accumulator(IN_BITWIDTH=PACC_IN_BW, OUT_BITWIDTH=PACC_OUT_BW, LOG2_NO_IN=LOG2_NO_VECS)
+
+def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16, 
+	R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128):
+	
+	warnings.warn("Warning: Inaccurate result (dense_layer_fp)")
+
+	LOG2_NO_VECS = int(np.ceil(np.log2(INPUT_SIZE)))
+	VLD_SR_LEN = LOG2_NO_VECS + 3
+	LOG2_CYC = int(np.ceil(np.log2(NUM_CYC)))
+
+	LUT = int((OUTPUT_SIZE * INPUT_SIZE * BW_W)/2)	# w_or_zero
+	LUT += (3 * LOG2_CYC) 		# comparator and counter 
+
+	FF = OUTPUT_SIZE * BW_OUT  	# res_out
+	FF += LOG2_CYC				# cntr
+	FF += VLD_SR_LEN			# vld_sr
+
+	BRAM = 0
 	DSP = 0
 
-	return np.array([LUT, FF, BRAM, DSP]) + pipelined_accumulator(IN_BITWIDTH=(BW_W+BW_IN), OUT_BITWIDTH=PACC_OUT_BW, LOG2_NO_IN=LOG2_NO_VECS)
+	temp = OUTPUT_SIZE * multiply_accumulate_fp(LOG2_NO_VECS=LOG2_NO_VECS, 
+		BW_IN=BW_IN, BW_OUT=BW_OUT, BW_W=BW_W, R_SHIFT=R_SHIFT, 
+		NUM_CYC=NUM_CYC, USE_UNSIGNED_DATA=USE_UNSIGNED_DATA, 
+		full_precision=False)
+	#print("LOG2_NO_VECS: %d, BW_IN: %d, BW_OUT: %d, BW_W: %d, R_SHIFT: %d, NUM_CYC: %d, USE_UNSIGNED_DATA: %d" % (LOG2_NO_VECS,BW_IN,BW_OUT,BW_W,R_SHIFT,NUM_CYC,USE_UNSIGNED_DATA))
+
+	# new_sum register optimizations
+	temp -= [0, (OUTPUT_SIZE-1)*(LOG2_NO_VECS+1), 0, 0]
+	#temp += [OUTPUT_SIZE*3, 0, 0, 0]
+
+	return np.array([LUT, FF, BRAM, DSP]) + temp
+
+def Conv_estimator(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
+
+	file = open(file_add, "r")
+	
+	Width = 16
+	zero_s = '\$signed\( %d\'h0 \)' % Width
+
+	REG = 0
+	ADD = 0 
+
+	for line in file:
+
+		signed = [m.start() for m in re.finditer('\$signed', line)]
+		signed_zero = [m.start() for m in re.finditer(zero_s, line)]
+
+		len_s = len(signed)
+		len_sz = len(signed_zero)
+
+		if (len_s != 0) & DEBUG:
+			print (line[0:-1])
+			print ("signed: %d, signed_zero %d" % (len_s, len_sz))
+
+		if len_s == 3:
+			if len_sz == 2:
+				REG += 1
+			elif len_sz == 1:
+				REG += 1
+				ADD += 1
+			else:
+				raise Exception("we don't expect this")
+		elif len_s == 0:
+			continue
+		else:
+			raise Exception("we don't expect this")
+
+	REG, ADD = REG * Width, ADD * Width
+	return REG, ADD
