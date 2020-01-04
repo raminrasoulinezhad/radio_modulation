@@ -23,8 +23,20 @@ python3 run_cnn.py --model=resnet_twn --fconv_ch=64 \
 		--gpus=0 --lr=0.01 --norespath
 date
 
+python3 run_cnn.py --model=resnet_twn --fconv_ch=16 --nu_fconv=1.2 --act_prec_fconv=16 \
+		--k_1=3 --lyr_conv=4 --conv_ch=16 --nu_conv=1.2 --act_prec_conv=16 --k_n=3 \
+		--n_resblock=1 --reslen=1 --lyr_fc=3 --fc_ch=128 --nu_dense=0.7 --act_prec_fc=16 \
+		--gpus=0 --lr=0.01 --norespath
+date
+
 python3 run_cnn.py --model=resnet_twn --fconv_ch=32 --nu_fconv=1.2 --act_prec_fconv=16 \
 		--k_1=3 --lyr_conv=4 --conv_ch=32 --nu_conv=1.2 --act_prec_conv=16 --k_n=3 \
+		--n_resblock=1 --reslen=1 --lyr_fc=3 --fc_ch=128 --nu_dense=0.7 --act_prec_fc=16 \
+		--gpus=0 --lr=0.01 --norespath
+date
+
+python3 run_cnn.py --model=resnet_twn --fconv_ch=64 --nu_fconv=1.2 --act_prec_fconv=16 \
+		--k_1=3 --lyr_conv=4 --conv_ch=64 --nu_conv=1.2 --act_prec_conv=16 --k_n=3 \
 		--n_resblock=1 --reslen=1 --lyr_fc=3 --fc_ch=128 --nu_dense=0.7 --act_prec_fc=16 \
 		--gpus=0 --lr=0.01 --norespath
 date
