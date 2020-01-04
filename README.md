@@ -108,3 +108,8 @@ generating verilogs:
 	MODEL_DIR=../models/vgg_twn_nu_1.2_0.7_f128
 	rm $MODEL_DIR/*_td*
 	time python3 generate_tw_vgg10.py --model_dir $MODEL_DIR --bws_in 16,16,8,4,2,1,1 --bws_out 16,16,8,4,2,1,1 -t n,n,s,s,s,s,s
+
+Forward log to a file:
+	
+	./script.sh 2>&1 | tee script.rpt
+
