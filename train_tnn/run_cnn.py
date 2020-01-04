@@ -251,7 +251,7 @@ if __name__ == "__main__":
 		print (str(arg) + ": \t"+ str(getattr(args, arg)))
 	
 	model_dir = ("../models/" + args.model 
-		+ "1stConv"
+		+ "_FConv"
 		+ "_" + str(args.fconv_ch) + "Co"
 		+ "_" + (("TW_nu%f" % (args.nu_fconv)) if (args.nu_fconv != None) else "FW")
 		+ "_Act" + (str(args.act_prec_fconv) if (args.act_prec_fconv != None) else "F")
@@ -261,8 +261,8 @@ if __name__ == "__main__":
 		+ "_" + (("TW_nu%f" % (args.nu_conv)) if (args.nu_conv != None) else "FW")
 		+ "_Act" + (str(args.act_prec_conv) if (args.act_prec_conv != None) else "F")
 		+ "_Kn" + str(args.k_n)
-		+ "NResB" + str(args.n_resblock)		
-		+ "ResLen" + str(args.reslen)			
+		+ "_NResB" + str(args.n_resblock)		
+		+ "_ResLen" + str(args.reslen)			
 		+ "_FCs" + str(args.lyr_fc) 
 		+ "_" + str(args.fc_ch) + "Co"
 		+ "_" + (("TW_nu%f" % (args.nu_dense)) if (args.nu_dense != None) else "FW")
