@@ -1,71 +1,65 @@
 #! /usr/bin/python3
-import os
 import tensorflow as tf
 import quantization as q
-
-def remover_mean(x, remove_mean):
-	if remove_mean:
-		mean, var = tf.nn.moments(x, axes=[1])
-		mean = tf.expand_dims(mean, 1)
-		mean = tf.tile(mean, [1, x.get_shape()[1], 1])
-		x = (x - mean)
-	return x
+from utils import remover_mean
 
 def dense_batch_selu_drop_relu(x, training=False, no_filt=128, nu=None, act_prec=None, bn_en=True, selu_en=False, drop_en=True, drop_rate=0.95, relu_en=False):
 	if nu is None:
-		cnn = tf.layers.dense(x, 128, kernel_initializer=q.get_initializer())
+		x = tf.layers.dense(x, 128, kernel_initializer=q.get_initializer())
 	else:
 		filter_shape = [x.get_shape()[-1], no_filt]
 		dense_filter = tf.compat.v1.get_variable("dense", filter_shape)
 		dense_filter = q.trinarize(dense_filter, nu=nu)
-		cnn = tf.matmul(x, dense_filter)
+		x = tf.matmul(x, dense_filter)
 
 	if bn_en:
-		cnn = tf.layers.batch_normalization(cnn, training=training)
+		x = tf.layers.batch_normalization(x, training=training)
 	if selu_en:
-		cnn = tf.nn.selu(cnn)
+		x = tf.nn.selu(x)
 
 	if drop_en:
-		dropped = tf.contrib.nn.alpha_dropout(cnn, drop_rate)
-		cnn = tf.where(training, dropped, cnn)
+		dropped = tf.contrib.nn.alpha_dropout(x, drop_rate)
+		x = tf.where(training, dropped, x)
 
 	if relu_en:
-		cnn = tf.nn.relu(cnn)
+		x = tf.nn.relu(x)
 	if act_prec is not None:
-		cnn = q.quant(cnn, act_prec, shift=not(relu_en))
-	return cnn
+		x = q.quant(x, act_prec, shift=not(relu_en))
+	return x
 
 def conv_batch_relu(x, training=False, no_filt=64, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False, pool_en=False, bn_en=True, relu_en=True):
 	if nu is None:
-		cnn = tf.layers.conv1d(x, no_filt, kernel, padding=padding, use_bias=use_bias)
+		x = tf.layers.conv1d(x, no_filt, kernel, padding=padding, use_bias=use_bias)
 	else:
 		filter_shape = [kernel, x.get_shape()[-1], no_filt]
 		conv_filter = tf.compat.v1.get_variable("conv_filter", filter_shape)
 		conv_filter = q.trinarize(conv_filter, nu=nu )
-		cnn = tf.nn.conv1d(x, conv_filter, 1, padding=padding)
+		x = tf.nn.conv1d(x, conv_filter, 1, padding=padding)
 	
 	if pool_en:
-		cnn = tf.layers.max_pooling1d(cnn, 2, 2)
+		x = tf.layers.max_pooling1d(x, 2, 2)
 	if bn_en:
-		cnn = tf.layers.batch_normalization(cnn, training=training)
+		x = tf.layers.batch_normalization(x, training=training)
 	if relu_en:
-		cnn = tf.nn.relu(cnn)
+		x = tf.nn.relu(x)
 	if act_prec is not None:
-		cnn = q.quant(cnn, act_prec, shift=not(relu_en))
-	return cnn
+		x = q.quant(x, act_prec, shift=not(relu_en))
+	return x
 
-def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", opt_ResBlock=False, respath=True): 
+def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", reslen=2, respath=True): 
 	no_filt = x.get_shape()[-1]
 	
-	with tf.variable_scope("res_unit_0"):
+	with tf.variable_scope("res_unit_fconv"):
 		cnn = conv_batch_relu(x, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding)
 
-	with tf.variable_scope("res_unit_1"):
-		if not opt_ResBlock:
-			# act_prec=None ==> a floating foint adder is required
-			# maybe I should make it act_prec=16 as well
-			cnn = conv_batch_relu(cnn, training, no_filt=no_filt, nu=nu, act_prec=None, kernel=kernel, padding=padding, relu_en=False)
-
+	for i in range(reslen):
+		with tf.variable_scope("res_unit_conv_%d" % i):
+			if i == (reslen-1):
+				# act_prec=None ==> a floating foint adder is required
+				# maybe I should make it act_prec=16 as well
+				cnn = conv_batch_relu(cnn, training, no_filt=no_filt, nu=nu, act_prec=None, kernel=kernel, padding=padding, relu_en=False)
+			else:
+				cnn = conv_batch_relu(cnn, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding, relu_en=False)
 	if respath:
 		cnn = cnn + x 
 	# this batch norm is added by me 
@@ -74,36 +68,39 @@ def residual_unit(x, training=False, nu=None, act_prec=None, kernel=3, padding="
 
 	return cnn
 
-def residual_stack(x, no_filt, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False, opt_ResBlock=False, n_convs=3, respath=True):
+def residual_stack(x, no_filt, training=False, nu=None, act_prec=None, kernel=3, padding="SAME", use_bias=False, n_resblock=1, reslen=2, respath=True):
 	with tf.compat.v1.variable_scope("NConv"):
-		cnn = conv_batch_relu(x, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding, use_bias=use_bias, relu_en=False)
+		x = conv_batch_relu(x, training, no_filt=no_filt, nu=nu, act_prec=act_prec, kernel=kernel, padding=padding, use_bias=use_bias, relu_en=False)
 
-	for i in range(0,n_convs-1):
+	for i in range(0,n_resblock):
 		with tf.variable_scope("ResBlock_"+str(i)):
-			cnn = residual_unit(cnn, training=training, opt_ResBlock=opt_ResBlock, respath=respath)
+			x = residual_unit(x, training=training, reslen=reslen, respath=respath)
 
-	cnn = tf.layers.max_pooling1d( cnn, 2, 2 )
-	return cnn
+	x = tf.layers.max_pooling1d( x, 2, 2 )
+	return x
 
-def get_net(x, training = False, no_filt=64, remove_mean=True, nu=None, act_prec=None, kernel=3, opt_ResBlock=False, n_stack_cnv=4, n_stack_fc=3, n_convs=3, respath=True):
+def get_net(x, training = False, no_filt=64, remove_mean=True, nu=None, act_prec=None, kernel=3, n_stack_cnv=4, n_stack_fc=3, n_resblock=1, reslen=2, respath=True):
 
 	print("nu: %s, \nact_prec: %s, \nkernel: %s" % (str(nu),str(act_prec),str(kernel)))
 	print (respath)
 
 	# remove the bias from all examples and make
-	cnn = remover_mean(x, remove_mean)
+	x = remover_mean(x, remove_mean)
+
+	with tf.compat.v1.variable_scope("FirstConv"):
+		x = conv_batch_relu(x, training, no_filt=no_filt, nu=nu[0], act_prec=act_prec[0], kernel=kernel[0])
 
 	for i in range(n_stack_cnv):
 		with tf.compat.v1.variable_scope("ResStack_"+str(i)):
-			cnn = residual_stack(cnn, no_filt, training=training, nu=nu[i], act_prec=act_prec[i], kernel=kernel[i], opt_ResBlock=opt_ResBlock, n_convs=n_convs, respath=respath)	
+			x = residual_stack(x, no_filt, training=training, nu=nu[i+1], act_prec=act_prec[i+1], kernel=kernel[i+1], n_resblock=n_resblock[i], reslen=reslen[i], respath=respath)	
 
-	cnn = tf.compat.v1.layers.flatten(cnn)
+	x = tf.compat.v1.layers.flatten(x)
 
 	for i in range(n_stack_fc):
 		with tf.compat.v1.variable_scope("DenseStack_"+str(i)):
 			if i == (n_stack_fc - 1):
-				cnn = tf.layers.dense(cnn, kernel[n_stack_cnv+i])
+				x = tf.layers.dense(x, kernel[n_stack_cnv+i])
 			else:
-				cnn = dense_batch_selu_drop_relu(cnn, training=training, no_filt=kernel[n_stack_cnv+i], nu=nu[n_stack_cnv+i], act_prec=act_prec[n_stack_cnv+i])
+				x = dense_batch_selu_drop_relu(x, training=training, no_filt=kernel[1+n_stack_cnv+i], nu=nu[1+n_stack_cnv+i], act_prec=act_prec[1+n_stack_cnv+i])
 
-	return cnn
+	return x
