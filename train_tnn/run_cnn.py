@@ -269,8 +269,6 @@ if __name__ == "__main__":
 		+ "_Act" + (str(args.act_prec_fc) if (args.act_prec_fc != None) else "F")
 		)
 
-				 
-				
 
 	if args.norespath and ("resnet" in args.model):
 		model_dir += "_norespath"
