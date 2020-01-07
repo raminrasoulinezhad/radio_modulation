@@ -146,7 +146,7 @@ def test_loop(snr, pred, label, training, fname, no_loops, gen_report=False):
 	if gen_report:
 		f_out.close()
 
-def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, do_val=True):
+def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, do_val=True, epoch_steps=100000):
 	summaries = tf.compat.v1.summary.merge_all()
 
 	curr_step = tf.compat.v1.train.get_global_step()
@@ -409,7 +409,7 @@ if __name__ == "__main__":
 			if args.test:
 				test_loop( snr, pred, label, training, args.test_output, args.test_batches )
 			else:
-				train_loop(opt, smry_wrt, corrects, training, batch_size=args.batch_size, steps=args.steps, do_val=do_val)#, epoch_steps=epoch_steps_train)
+				train_loop(opt, smry_wrt, corrects, training, batch_size=args.batch_size, steps=args.steps, do_val=do_val, epoch_steps=epoch_steps_train)
 
 		except tf.errors.OutOfRangeError:
 			tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Dataset is finished" )
