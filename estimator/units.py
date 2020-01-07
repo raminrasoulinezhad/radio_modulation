@@ -273,10 +273,31 @@ def Conv_estimator(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
 				ADD += 1
 			else:
 				raise Exception("we don't expect this")
-		elif len_s == 0:
-			continue
-		else:
+		elif len_s != 0:
 			raise Exception("we don't expect this")
 
-	REG, ADD = REG * Width, ADD * Width
-	return REG, ADD
+		if line[0:3] == "reg":
+			#print(line[0:-1])
+		
+			m = re.match(r"reg \[(?P<reg_size>\d+):0\]\[15:0\] out_(?P<index>\d+);", line)
+			#m = re.match(r"(?P<first_name>\w+) (?P<last_name>\w+)", line)
+			#m = re.search('(?<=reg) \[(\d+)\:(\d+)', line)
+			#m = re.search('(?<=[)\w+', line)
+			if m != None:
+				#print(m.groupdict())
+				temp = int(m.group('reg_size')) + 1
+				REG += temp 
+			
+			#if m.group(0) != None:
+			#	print(m.group(0))
+			
+	LUT = ADD * Width	# tree_ & out_
+	
+	FF = REG * Width	# tree_
+	FF += 6 			# rst_reg
+	FF += 7 			# vld_reg
+
+	DSP = 0
+	BRAM = 0
+
+	return np.array([LUT, FF, BRAM, DSP])
