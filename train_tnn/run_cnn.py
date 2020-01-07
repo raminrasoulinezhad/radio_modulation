@@ -65,7 +65,6 @@ def filter_snr_t( signal, label, snr, teacher ):
 def filter_snr( signal, label, snr ):
 	return tf.math.greater( snr, 4 )
 
-
 def batcher( input_file, batch_size, training = True, use_teacher = False ):
 	dset = tf.data.TFRecordDataset( [ input_file ] )
 	dset = dset.map( lambda x: parse_example( x, use_teacher and training ) )
@@ -109,7 +108,7 @@ def get_optimizer( pred, label, learning_rate, resnet_pred = None ):
 		100000,
 		0.3 #0.5
 	)
-	# lr = learning_rate
+	
 	pred = tf.math.argmax( pred, axis = 1 )
 	correct = tf.cast( tf.math.equal( pred, tf.cast( label, tf.int64 ) ), tf.float32 )
 	accr = tf.reduce_mean( correct )
@@ -121,51 +120,68 @@ def get_optimizer( pred, label, learning_rate, resnet_pred = None ):
 	with tf.control_dependencies(update_ops):
 		return opt.minimize( err, global_step = tf.compat.v1.train.get_or_create_global_step() )
 
-def test_loop( snr, pred, label, training, fname, no_loops ):
+def test_loop(snr, pred, label, training, fname, no_loops, gen_report=False):
 	pred = tf.math.argmax( pred, axis = 1 )
-	if fname is None:
-		fname = "test_pred.csv"
-	f_out = open( fname, "w" )
-	wrt = csv.writer( f_out )
+	if gen_report:
+		if fname is None:
+			fname = "test_pred.csv"
+		f_out = open( fname, "w" )
+		wrt = csv.writer( f_out )
+
 	corr_cnt = 0
 	total_cnt = 0
 	for i in tqdm(range( no_loops )):
-		snr_out, pred_out, label_out = sess.run( [ snr, pred, label ], feed_dict = { training : False } )
-		for s, p, l in zip( snr_out, pred_out, label_out ):
+		snr_out, pred_out, label_out = sess.run([snr, pred, label], feed_dict={training:False})
+		for s, p, l in zip(snr_out, pred_out, label_out):
 			if p == l:
 				corr_cnt += 1
-			wrt.writerow( [ s, p, l ] )
-			total_cnt += 1
-	tf.logging.log( tf.logging.INFO, "Test done, accr = : " + str( corr_cnt / total_cnt ) )
-	f_out.close()
-
-def train_loop( opt, summary_writer, num_correct, training, no_test_batches, batch_size, no_steps=100000, do_val=True, log_steps=1000, epoch_steps=math.ceil(24*26*4100*0.9)):
-	summaries = tf.compat.v1.summary.merge_all()
-	curr_step = tf.compat.v1.train.get_global_step()
-	step = sess.run( curr_step )
-	tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Starting train loop at step " + str(step) )
-	try:
-		for i in range( step, no_steps ):
-			step, _, smry = sess.run( [ curr_step, opt, summaries ], feed_dict = { training : True } )
-			if (step+1) % 20 == 0:
-				summary_writer.add_summary( smry, step )
-
-			if (step+1) % log_steps == 0 and do_val:
-				cnt = 0
-				for i in range( no_test_batches ):
-					corr = sess.run( num_correct, feed_dict = { training : False } )
-					cnt += corr
-				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Step: " + str(step+1) + " - Test batch complete: accr = " + str( cnt / (no_test_batches*batch_size) )  )
 			
+			if gen_report:
+				wrt.writerow([ s, p, l ])
+			
+			total_cnt += 1
+
+	tf.logging.log( tf.logging.INFO, "Test done, accr = : " + str(corr_cnt/total_cnt) )
+	
+	if gen_report:
+		f_out.close()
+
+def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, do_val=True):
+	summaries = tf.compat.v1.summary.merge_all()
+
+	curr_step = tf.compat.v1.train.get_global_step()
+	step = sess.run(curr_step)
+	tf.compat.v1.logging.log(tf.compat.v1.logging.INFO, "Starting train loop at step " + str(step))
+	
+	steps_log = 10000
+	test_size = 410*24
+	steps_test = int(math.ceil(test_size/batch_size))
+
+	try:
+		for i in range(step, steps):
+
+			step, _, smry = sess.run( [ curr_step, opt, summaries ], feed_dict = { training : True } )
+
+			if (step+1) % 100 == 0:
+				smry_wrt.add_summary(smry, step)
+
+			if (step+1) % steps_log == 0 and do_val:
+				cnt = 0
+				for i in range( steps_test ):
+					corr = sess.run(corrects, feed_dict={training:False})
+					cnt += corr
+				tf.compat.v1.logging.log(tf.compat.v1.logging.INFO, "Step: " + str(step+1) + " - Test accr(snr="+str(snr)+") = " + str(cnt/test_size) )
+		
 			if (step+1) % epoch_steps == 0 and do_val:
 				cnt = 0
-				for i in range( no_test_batches ):
-					corr = sess.run( num_correct, feed_dict = { training : False } )
+				for i in range( steps_test ):
+					corr = sess.run( corrects, feed_dict = { training : False } )
 					cnt += corr
-				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch: accr = " + str(cnt/(no_test_batches*batch_size)))
+				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch("+str(int((step+1) / epoch_steps))+"): accr = " + str(cnt/test_size))
 
 	except KeyboardInterrupt:
 		tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Ctrl-c recieved, training stopped" )
+
 	return
 
 def print_conf_mat( preds, labels ):
@@ -191,11 +207,11 @@ def get_args():
 	parser.add_argument( "--val_dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd",
 						 help = "The dataset to validate on when training" )
 	parser.add_argument( "--steps", type = int, help = "The number of training steps" )
-	parser.add_argument( "--epochs", type = int, default = 1, help = "The number of training epochs" )
+	parser.add_argument( "--epochs", type = int, default=None, help = "The number of training epochs" )
 	parser.add_argument( "--test", action = "store_true", help = "Test the model on this dataset" )
 	parser.add_argument( "--no_mean", action = "store_true", help = "Do not remove the mean of the signal before processing" )
 	parser.add_argument( "--test_output", type = str, help = "Filename to save the output in csv format ( pred, label )" )
-	parser.add_argument( "--test_batches", type = int, default = math.ceil( 410*24/64 ), help = "Number of batches to run on" )
+	parser.add_argument( "--test_batches", type = int, default = int(math.ceil( 410*24/64)), help = "Number of batches to run on" )
 	parser.add_argument( "--batch_size", type=int, default = 64, help = "Batch size to use" )
 	parser.add_argument( "--lr", type=float, default = 0.01, help = "The learning rate to use when training" )
 	
@@ -237,57 +253,18 @@ def get_args():
 
 	return parser.parse_args()
 
-if __name__ == "__main__":
-	args = get_args()
 
-	# computing the required steps
-	print("****************************************")
-	epoch_steps = 24*26*4100
-	epoch_steps_train = math.ceil(epoch_steps*0.9)
-	args.steps = epoch_steps_train*args.epochs
-	print("Epochs: %d, each: %d steps" % (args.epochs, epoch_steps_train))
-	print("Steps: %d" % (args.steps))
-	for arg in vars(args):
-		print (str(arg) + ": \t"+ str(getattr(args, arg)))
-	
-	model_dir = ("../models/" + args.model 
-		+ "_FConv"
-		+ "_" + str(args.fconv_ch) + "Co"
-		+ "_" + (("TW_nu%f" % (args.nu_fconv)) if (args.nu_fconv != None) else "FW")
-		+ "_Act" + (str(args.act_prec_fconv) if (args.act_prec_fconv != None) else "F")
-		+ "_K1st" + str(args.k_1)
-		+ "_Convs" + str(args.lyr_conv) 
-		+ "_" + str(args.conv_ch) + "Co"
-		+ "_" + (("TW_nu%f" % (args.nu_conv)) if (args.nu_conv != None) else "FW")
-		+ "_Act" + (str(args.act_prec_conv) if (args.act_prec_conv != None) else "F")
-		+ "_Kn" + str(args.k_n)
-		+ "_NResB" + str(args.n_resblock)		
-		+ "_ResLen" + str(args.reslen)			
-		+ "_FCs" + str(args.lyr_fc) 
-		+ "_" + str(args.fc_ch) + "Co"
-		+ "_" + (("TW_nu%f" % (args.nu_dense)) if (args.nu_dense != None) else "FW")
-		+ "_Act" + (str(args.act_prec_fc) if (args.act_prec_fc != None) else "F")
-		)
-
-				 
-				
-
-	if args.norespath and ("resnet" in args.model):
-		model_dir += "_norespath"
-
-	print ("directory: " + model_dir)
-	print("****************************************")
-
+def data_lable_iterator(args, training):
 	iterator = batcher( args.dataset, args.batch_size, not args.test, args.teacher_dset )
-	if args.gpus is not None:
-		os.environ["CUDA_VISIBLE_DEVICES"]=args.gpus
-	tf.compat.v1.logging.set_verbosity( tf.compat.v1.logging.INFO )
-	training = tf.compat.v1.placeholder( tf.bool, name = "training" )
+	test_iterator = None
+	do_val = None
+
 	if not args.test:
 		if args.teacher_dset:
 			train_signal, train_label, train_snr, teacher = iterator.get_next()
 		else:
 			train_signal, train_label, train_snr = iterator.get_next()
+
 		do_val = True
 		if args.val_dataset is not None:
 			test_iterator = batcher( args.val_dataset, args.batch_size, not args.test )
@@ -295,11 +272,17 @@ if __name__ == "__main__":
 			signal = tf.where( training, train_signal, test_signal )
 			label = tf.where( training, train_label, test_label )
 			snr = tf.where( training, train_snr, test_snr )
+
 		else:
 			signal, label, snr = ( train_signal, train_label, train_snr )
 			do_val = False
 	else:
 		signal, label, snr = iterator.get_next()
+
+	return iterator, test_iterator, do_val, signal, label, snr
+
+def network_gen(args, signal, training):
+
 	nu = [0.7] + [args.nu_conv]*6 + [args.nu_dense]*2
 	no_filt = 64
 	if args.no_filt_vgg is not None:
@@ -310,7 +293,8 @@ if __name__ == "__main__":
 
 	if args.model == "resnet":
 		with tf.variable_scope("teacher"):
-			pred = resnet.get_net( signal, training=training, remove_mean = not args.no_mean )
+			pred = resnet.get_net( signal, training=training, remove_mean=not(args.no_mean) )
+
 	elif args.model == "resnet_twn":
 		n_stack_cnv = args.lyr_conv
 		n_stack_fc = args.lyr_fc
@@ -342,11 +326,58 @@ if __name__ == "__main__":
 		tf.compat.v1.logging.log( tf.compat.v1.logging.ERROR, "Invalid arguments" )
 		exit()
 
+	return pred
+
+
+if __name__ == "__main__":
+	args = get_args()
+
+	# computing the required steps
+	print("****************************************")
+	epoch_steps_train = int(24*26*3686/args.batch_size)
+	args.steps = epoch_steps_train * args.epochs
+
+	for arg in vars(args):
+		print (str(arg) + ": \t"+ str(getattr(args, arg)))
+	
+	model_dir = ("../models/" + args.model 
+		+ "_FConv"
+		+ "_" + str(args.fconv_ch) + "Co"
+		+ "_" + (("TW_nu%f" % (args.nu_fconv)) if (args.nu_fconv != None) else "FW")
+		+ "_Act" + (str(args.act_prec_fconv) if (args.act_prec_fconv != None) else "F")
+		+ "_K1st" + str(args.k_1)
+		+ "_Convs" + str(args.lyr_conv) 
+		+ "_" + str(args.conv_ch) + "Co"
+		+ "_" + (("TW_nu%f" % (args.nu_conv)) if (args.nu_conv != None) else "FW")
+		+ "_Act" + (str(args.act_prec_conv) if (args.act_prec_conv != None) else "F")
+		+ "_Kn" + str(args.k_n)
+		+ "_NResB" + str(args.n_resblock)		
+		+ "_ResLen" + str(args.reslen)			
+		+ "_FCs" + str(args.lyr_fc) 
+		+ "_" + str(args.fc_ch) + "Co"
+		+ "_" + (("TW_nu%f" % (args.nu_dense)) if (args.nu_dense != None) else "FW")
+		+ "_Act" + (str(args.act_prec_fc) if (args.act_prec_fc != None) else "F")
+		+ ("_norespath" if (args.norespath and ("resnet" in args.model)) else "")
+		)
+
+	print ("directory: " + model_dir)
+	print("****************************************")
+
+	
+	if args.gpus is not None:
+		os.environ["CUDA_VISIBLE_DEVICES"]=args.gpus
+	tf.compat.v1.logging.set_verbosity( tf.compat.v1.logging.INFO )
+	training = tf.compat.v1.placeholder( tf.bool, name = "training" )
+
+	iterator, test_iterator, do_val, signal, label, snr = data_lable_iterator(args, training)
+
+	pred = network_gen(args, signal, training)
 
 	if not args.test:
 		pred_label = tf.cast( tf.math.argmax( pred, axis = 1 ), tf.int32 )
-		num_correct = tf.reduce_sum( tf.cast( tf.math.equal( pred_label, label ), tf.float32 ) )
-		num_correct = tf.reshape( num_correct, [] )
+		corrects = tf.reduce_sum( tf.cast( tf.math.equal( pred_label, label ), tf.float32 ) )
+		corrects = tf.reshape( corrects, [] )
+
 		resnet_pred = None
 		if args.teacher_name is not None:
 			with tf.variable_scope("teacher"):
@@ -358,6 +389,7 @@ if __name__ == "__main__":
 	init_op = tf.compat.v1.global_variables_initializer()
 	saver = tf.compat.v1.train.Saver()
 	tf.compat.v1.summary.histogram( "snr", snr )
+
 	with tf.compat.v1.Session() as sess:
 		try:
 			if not args.test:
@@ -373,10 +405,12 @@ if __name__ == "__main__":
 			if args.teacher_name is not None and tf.train.checkpoint_exists( args.teacher_name ):
 				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Loading teacher ... " )
 				resnet_saver.restore(sess, args.teacher_name )
+
 			if args.test:
 				test_loop( snr, pred, label, training, args.test_output, args.test_batches )
 			else:
-				train_loop( opt, smry_wrt, num_correct, training, args.test_batches, args.batch_size, no_steps=args.steps, do_val=do_val, log_steps=10000, epoch_steps=epoch_steps_train)
+				train_loop(opt, smry_wrt, corrects, training, batch_size=args.batch_size, steps=args.steps, do_val=do_val)#, epoch_steps=epoch_steps_train)
+
 		except tf.errors.OutOfRangeError:
 			tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Dataset is finished" )
 

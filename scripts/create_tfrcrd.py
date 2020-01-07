@@ -8,7 +8,7 @@ import random
 import argparse
 import os
 
-def get_example( x, y, snr, rcrd_prefix, rcrd_suffix ):
+def get_example( x, y, snr):
     label = int( np.argmax( y ) ).to_bytes( 1, byteorder='big')
     signal = np.reshape( np.transpose( x ), [ 2048 ] ) # flatten the signal to 1024xI followed by 1024xQ
     ftrs = {
@@ -20,7 +20,7 @@ def get_example( x, y, snr, rcrd_prefix, rcrd_suffix ):
     return example.SerializeToString()
 
 def make_wrt( snr, rcrd_prefix, rcrd_suffix ):
-    return tf.python_io.TFRecordWriter( rcrd_prefix + str( snr ) + rcrd_suffix )
+    return tf.io.TFRecordWriter( rcrd_prefix + str( snr ) + rcrd_suffix )
 
 def add_to_rcrd( ex, wrts, snr, rcrd_prefix, rcrd_suffix ):
     if snr not in wrts:
@@ -53,20 +53,28 @@ if __name__ == "__main__":
     p_idx = 0
     test_wrts = {}
     prefix = dirname + "/" + args.rcrd_prefix
+
     for x, y, snr in zip( f["X"], f["Y"], f["Z"] ):
-        snr = int( snr )
-        ex = get_example( x, y, snr, prefix + "_test_snr_", args.rcrd_suffix )
+
+        snr = int(snr)
+        ex = get_example(x, y, snr)
+
         if partition[p_idx]:
             train_ex += [ ex ]
         else:
-            test_wrts = add_to_rcrd( ex, test_wrts, snr, args.rcrd_prefix, args.rcrd_suffix )
+            test_wrts = add_to_rcrd( ex, test_wrts, snr, prefix + "_test_snr_", args.rcrd_suffix )
+        
         p_idx = ( p_idx + 1 ) % 4096
         if p_idx == 0:
             partition = partition_dataset()
+
     for snr in test_wrts:
         test_wrts[snr].close()
-    np.random.shuffle( train_ex )
-    train_wrt = tf.python_io.TFRecordWriter( prefix + "_train" + args.rcrd_suffix )
+
+    np.random.shuffle(train_ex)
+    train_wrt = tf.io.TFRecordWriter( prefix + "_train" + args.rcrd_suffix )
+
     for ex in train_ex:
         train_wrt.write( ex )
+
     train_wrt.close()
