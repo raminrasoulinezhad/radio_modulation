@@ -122,3 +122,4 @@ rt_amc_models
 ModelSim/
 Vivado_test/
 
+train_tnn/test_pred.csv
