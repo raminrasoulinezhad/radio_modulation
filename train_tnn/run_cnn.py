@@ -204,7 +204,7 @@ def get_args():
 	teacher.add_argument( "--teacher_dset", action='store_true', help="Use teacher values in the dataset")
 	parser.add_argument( "--dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_resnet_train.rcrd",
 						 help = "The dataset to train or test on" )
-	parser.add_argument( "--val_dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_test_snr_-10.rcrd",
+	parser.add_argument( "--val_dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd",
 						 help = "The dataset to validate on when training" )
 	parser.add_argument( "--steps", type = int, help = "The number of training steps" )
 	parser.add_argument( "--epochs", type = int, default=None, help = "The number of training epochs" )
