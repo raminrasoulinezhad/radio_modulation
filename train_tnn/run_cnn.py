@@ -12,34 +12,6 @@ import quantization as q
 import math
 import sys
 
-'''
-Classes:
-0) OOK,
-1) 4ASK,
-2) 8ASK,
-3) BPSK,
-4) QPSK,
-5) 8PSK,
-6) 16PSK,
-7) 32PSK,
-8) 16APSK,
-9) 32APSK,
-10) 64APSK,
-11) 128APSK,
-12) 16QAM,
-13) 32QAM,
-14) 64QAM,
-15) 128QAM,
-16) 256QAM,
-17) AM-SSB-WC,
-18) AM-SSB-SC,
-19) AM-DSB-WC,
-20) AM-DSB-SC,
-21) FM,
-22) GMSK,
-23) OQPSK
-'''
-
 def parse_example( ex, use_teacher = False ):
 	ftrs = {
 		"signal" : tf.io.FixedLenFeature( shape = [2048 ], dtype = tf.float32 ),
@@ -141,7 +113,8 @@ def test_loop(snr, pred, label, training, fname, no_loops, gen_report=False):
 			
 			total_cnt += 1
 
-	tf.logging.log( tf.logging.INFO, "Test done, accr = : " + str(corr_cnt/total_cnt) )
+	tf.logging.log( tf.logging.INFO, "Test done, accr = %0.6f: " % (corr_cnt/total_cnt) )
+	print ( "Test done, accr = %0.6f: " % (corr_cnt/total_cnt) )
 	
 	if gen_report:
 		f_out.close()
@@ -173,6 +146,7 @@ def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, d
 					corr = sess.run(corrects, feed_dict={training:False})
 					cnt += corr
 				tf.compat.v1.logging.log(tf.compat.v1.logging.INFO, "Step: " + str(step+1) + " - Test accr = " + str(cnt/test_size) )
+				print( "Step: " + str(step+1) + " - Test accr = " + str(cnt/test_size) )
 		
 			if (step+1) % epoch_steps == 0 and do_val:
 				cnt = 0
@@ -185,6 +159,7 @@ def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, d
 				if acc_best < acc:
 					acc_best = acc
 				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch(%dK): acc = %0.4f,\tbest acc = %0.4f" % (ep, acc, acc_best) )
+				print("Epoch(%dK): acc = %0.4f,\tbest acc = %0.4f" % (ep, acc, acc_best))
 
 	except KeyboardInterrupt:
 		tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Ctrl-c recieved, training stopped" )
@@ -214,7 +189,7 @@ def get_args():
 	parser.add_argument( "--val_dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd",
 						 help = "The dataset to validate on when training" )
 	parser.add_argument( "--steps", type = int, help = "The number of training steps" )
-	parser.add_argument( "--epochs", type = int, default=10, help = "The number of training epochs" )
+	parser.add_argument( "--epochs", type = int, default=1, help = "The number of training epochs" )
 	parser.add_argument( "--test", action = "store_true", help = "Test the model on this dataset" )
 	parser.add_argument( "--no_mean", action = "store_true", help = "Do not remove the mean of the signal before processing" )
 	parser.add_argument( "--test_output", type = str, default=None, help = "Filename to save the output in csv format ( pred, label )" )
@@ -338,7 +313,7 @@ def network_gen(args, signal, training):
 		n_stack_cnv = args.lyr_conv
 		n_stack_fc = args.lyr_fc
 
-		kernel = [args.k_1] + [args.k_n] * n_stack_cnv + [128,128,24]
+		kernel = [args.k_1] + [args.k_n] * n_stack_cnv + [128] * (n_stack_fc - 1 ) + [24]
 		nu = [args.nu_fconv] + [args.nu_conv] * n_stack_cnv + [args.nu_dense] * n_stack_fc
 		act_prec =  [args.act_prec_fconv] + [args.act_prec_conv] * n_stack_cnv + [args.act_prec_fc] * n_stack_fc 		# quantize [0-1] #act_prec = [None]*9 	
 		n_resblock = [args.n_resblock] * n_stack_cnv
