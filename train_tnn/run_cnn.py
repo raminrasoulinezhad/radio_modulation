@@ -157,6 +157,8 @@ def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, d
 	test_size = 410*24
 	steps_test = int(math.ceil(test_size/batch_size))
 
+	acc_best = 0.0
+
 	try:
 		for i in range(step, steps):
 
@@ -170,14 +172,19 @@ def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, d
 				for i in range( steps_test ):
 					corr = sess.run(corrects, feed_dict={training:False})
 					cnt += corr
-				tf.compat.v1.logging.log(tf.compat.v1.logging.INFO, "Step: " + str(step+1) + " - Test accr(snr="+str(snr)+") = " + str(cnt/test_size) )
+				tf.compat.v1.logging.log(tf.compat.v1.logging.INFO, "Step: " + str(step+1) + " - Test accr = " + str(cnt/test_size) )
 		
 			if (step+1) % epoch_steps == 0 and do_val:
 				cnt = 0
 				for i in range( steps_test ):
 					corr = sess.run( corrects, feed_dict = { training : False } )
 					cnt += corr
-				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch("+str(int((step+1) / epoch_steps))+"): accr = " + str(cnt/test_size))
+
+				ep = int(math.ceil( (step+1) / (epoch_steps*1000) ))
+				acc = cnt/test_size
+				if acc_best < acc:
+					acc_best = acc
+				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch(%dK): acc = %0.4f,\tbest acc = %0.4f" % (ep, acc, acc_best) )
 
 	except KeyboardInterrupt:
 		tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Ctrl-c recieved, training stopped" )
@@ -207,11 +214,11 @@ def get_args():
 	parser.add_argument( "--val_dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd",
 						 help = "The dataset to validate on when training" )
 	parser.add_argument( "--steps", type = int, help = "The number of training steps" )
-	parser.add_argument( "--epochs", type = int, default=None, help = "The number of training epochs" )
+	parser.add_argument( "--epochs", type = int, default=10, help = "The number of training epochs" )
 	parser.add_argument( "--test", action = "store_true", help = "Test the model on this dataset" )
 	parser.add_argument( "--no_mean", action = "store_true", help = "Do not remove the mean of the signal before processing" )
-	parser.add_argument( "--test_output", type = str, help = "Filename to save the output in csv format ( pred, label )" )
-	parser.add_argument( "--test_batches", type = int, default = int(math.ceil( 410*24/64)), help = "Number of batches to run on" )
+	parser.add_argument( "--test_output", type = str, default=None, help = "Filename to save the output in csv format ( pred, label )" )
+	parser.add_argument( "--test_batches", type = int, default = int(math.ceil(410*24/64)), help = "Number of batches to run on" )
 	parser.add_argument( "--batch_size", type=int, default = 64, help = "Batch size to use" )
 	parser.add_argument( "--lr", type=float, default = 0.01, help = "The learning rate to use when training" )
 	
@@ -251,7 +258,39 @@ def get_args():
 
 	parser.add_argument( "--gpus", type=str, help = "GPUs to use" )
 
-	return parser.parse_args()
+	args = parser.parse_args()
+	# computing the required steps
+	print("****************************************")
+	epoch_steps_train = int(24*26*3686/args.batch_size)
+	args.steps = epoch_steps_train * args.epochs
+
+	for arg in vars(args):
+		print (str(arg) + ": \t"+ str(getattr(args, arg)))
+	
+	model_dir = ("../models/" + args.model 
+		+ "_FConv"
+		+ "_" + str(args.fconv_ch) + "Co"
+		+ "_" + (("TW_nu%0.1f" % (args.nu_fconv)) if (args.nu_fconv != None) else "FW")
+		+ "_Act" + (str(args.act_prec_fconv) if (args.act_prec_fconv != None) else "F")
+		+ "_K1st" + str(args.k_1)
+		+ "_Convs" + str(args.lyr_conv) 
+		+ "_" + str(args.conv_ch) + "Co"
+		+ "_" + (("TW_nu%0.1f" % (args.nu_conv)) if (args.nu_conv != None) else "FW")
+		+ "_Act" + (str(args.act_prec_conv) if (args.act_prec_conv != None) else "F")
+		+ "_Kn" + str(args.k_n)
+		+ "_NResB" + str(args.n_resblock)		
+		+ "_ResLen" + str(args.reslen)			
+		+ "_FCs" + str(args.lyr_fc) 
+		+ "_" + str(args.fc_ch) + "Co"
+		+ "_" + (("TW_nu%0.1f" % (args.nu_dense)) if (args.nu_dense != None) else "FW")
+		+ "_Act" + (str(args.act_prec_fc) if (args.act_prec_fc != None) else "F")
+		+ ("_norespath" if (args.norespath and ("resnet" in args.model)) else "")
+		)
+
+	print ("directory: " + model_dir)
+	print("****************************************")
+
+	return args, model_dir, epoch_steps_train
 
 
 def data_lable_iterator(args, training):
@@ -330,39 +369,8 @@ def network_gen(args, signal, training):
 
 
 if __name__ == "__main__":
-	args = get_args()
 
-	# computing the required steps
-	print("****************************************")
-	epoch_steps_train = int(24*26*3686/args.batch_size)
-	args.steps = epoch_steps_train * args.epochs
-
-	for arg in vars(args):
-		print (str(arg) + ": \t"+ str(getattr(args, arg)))
-	
-	model_dir = ("../models/" + args.model 
-		+ "_FConv"
-		+ "_" + str(args.fconv_ch) + "Co"
-		+ "_" + (("TW_nu%f" % (args.nu_fconv)) if (args.nu_fconv != None) else "FW")
-		+ "_Act" + (str(args.act_prec_fconv) if (args.act_prec_fconv != None) else "F")
-		+ "_K1st" + str(args.k_1)
-		+ "_Convs" + str(args.lyr_conv) 
-		+ "_" + str(args.conv_ch) + "Co"
-		+ "_" + (("TW_nu%f" % (args.nu_conv)) if (args.nu_conv != None) else "FW")
-		+ "_Act" + (str(args.act_prec_conv) if (args.act_prec_conv != None) else "F")
-		+ "_Kn" + str(args.k_n)
-		+ "_NResB" + str(args.n_resblock)		
-		+ "_ResLen" + str(args.reslen)			
-		+ "_FCs" + str(args.lyr_fc) 
-		+ "_" + str(args.fc_ch) + "Co"
-		+ "_" + (("TW_nu%f" % (args.nu_dense)) if (args.nu_dense != None) else "FW")
-		+ "_Act" + (str(args.act_prec_fc) if (args.act_prec_fc != None) else "F")
-		+ ("_norespath" if (args.norespath and ("resnet" in args.model)) else "")
-		)
-
-	print ("directory: " + model_dir)
-	print("****************************************")
-
+	args, model_dir, epoch_steps_train = get_args()
 	
 	if args.gpus is not None:
 		os.environ["CUDA_VISIBLE_DEVICES"]=args.gpus
