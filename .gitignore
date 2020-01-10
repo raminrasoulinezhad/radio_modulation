@@ -123,3 +123,4 @@ ModelSim/
 Vivado_test/
 
 train_tnn/test_pred.csv
+Synthesis_Implementation_tests/experiments*
