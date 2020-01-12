@@ -145,7 +145,7 @@ def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, d
 				for i in range( steps_test ):
 					corr = sess.run(corrects, feed_dict={training:False})
 					cnt += corr
-				tf.compat.v1.logging.log(tf.compat.v1.logging.INFO, "Step: " + str(step+1) + " - Test accr = " + str(cnt/test_size) )
+				tf.compat.v1.logging.log(tf.compat.v1.logging.INFO, "Step: " + str(int((step+1)/1000)) + "K - Test accr = " + str(cnt/test_size) )
 				print( "Step: " + str(step+1) + " - Test accr = " + str(cnt/test_size) )
 		
 			if (step+1) % epoch_steps == 0 and do_val:
@@ -154,11 +154,11 @@ def train_loop(opt, smry_wrt, corrects, training, batch_size=32, steps=100000, d
 					corr = sess.run( corrects, feed_dict = { training : False } )
 					cnt += corr
 
-				ep = int(math.ceil( (step+1) / (epoch_steps*1000) ))
+				ep = int(math.ceil( (step+1) / (epoch_steps) ))
 				acc = cnt/test_size
 				if acc_best < acc:
 					acc_best = acc
-				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch(%dK): acc = %0.4f,\tbest acc = %0.4f" % (ep, acc, acc_best) )
+				tf.compat.v1.logging.log( tf.compat.v1.logging.INFO, "Epoch(%d): acc = %0.4f,\tbest acc = %0.4f" % (ep, acc, acc_best) )
 				print("Epoch(%dK): acc = %0.4f,\tbest acc = %0.4f" % (ep, acc, acc_best))
 
 	except KeyboardInterrupt:
@@ -189,7 +189,7 @@ def get_args():
 	parser.add_argument( "--val_dataset", type=str, default="/opt/datasets/deepsig/modulation_classification_test_snr_30.rcrd",
 						 help = "The dataset to validate on when training" )
 	parser.add_argument( "--steps", type = int, help = "The number of training steps" )
-	parser.add_argument( "--epochs", type = int, default=1, help = "The number of training epochs" )
+	parser.add_argument( "--epochs", type = int, default=10, help = "The number of training epochs" )
 	parser.add_argument( "--test", action = "store_true", help = "Test the model on this dataset" )
 	parser.add_argument( "--no_mean", action = "store_true", help = "Do not remove the mean of the signal before processing" )
 	parser.add_argument( "--test_output", type = str, default=None, help = "Filename to save the output in csv format ( pred, label )" )
