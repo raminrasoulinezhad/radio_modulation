@@ -245,9 +245,13 @@ def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16,
 
 
 
+def conv(K=3, Cin=64, Cout=64, Streams=1, Precision=16, Deep=1, file_add="../rt_amc_models/f64/srcs/conv1.sv", stat=True):
+	if stat:
+		return conv_stat(K=K, Cin=Cin, Cout=Cout, Streams=Streams, Precision=Precision, Deep=Deep)
+	else:
+		return conv_file(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False)		
 
-
-def conv_estimator_old(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
+def conv_file(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
 
 	file = open(file_add, "r")
 	
@@ -400,23 +404,26 @@ def conv_estimator_old(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=Fals
 	return np.array([LUT, FF, BRAM, DSP])
 
 
-def conv_estimate(K, Cin, Cout, Streams=1, Precision=16, Deep=1):
+def conv_stat(K, Cin, Cout, Streams=1, Precision=16, Deep=1):
+	# Deep = 1, for the very first layer
+	# Deep = 2, neither very first and last two convs
+	# Deep = 3, for the last two convs
 
 	Total = K * Cin * Cout * Streams * Precision
 
 	if Deep == 1:
 		LUT_facor = 0.06
 	elif Deep == 2:
-		LUT_facor = 0.15
+		LUT_facor = 0.13
 	else:
 		LUT_facor = 0.25
 
 	if Deep == 1:
-		FF_facor = 0.06
+		FF_facor = 0.26
 	elif Deep == 2:
-		FF_facor = 0.15
+		FF_facor = 0.19
 	else:
-		FF_facor = 0.25
+		FF_facor = 0.30
 
 	LUT = Total * LUT_facor
 	FF = Total * FF_facor
