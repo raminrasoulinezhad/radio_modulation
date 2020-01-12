@@ -113,7 +113,7 @@ Forward log to a file:
 	
 	./script.sh 2>&1 | tee script.rpt
 
-## Classes
+Classes
 
 	0) OOK,
 	1) 4ASK,
@@ -140,3 +140,6 @@ Forward log to a file:
 	22) GMSK,
 	23) OQPSK
 
+Sed (Sid :) 
+
+	cat ./*  | grep "CLB LUTs" | sed -e "s/[^0-9.]/ /g" -e "s/  */ /g" | sed "s/ *//" | sed "s/ /\n/" | sed -n 1~2p
