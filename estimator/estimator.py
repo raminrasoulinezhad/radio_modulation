@@ -4,6 +4,7 @@ import numpy as np
 
 from utils import *
 from units import *
+from units_tb import *
 
 def get_args():
 	parser = argparse.ArgumentParser()
@@ -13,8 +14,8 @@ def get_args():
 if __name__ == "__main__":
 	args = get_args()
 	
-	R = np.array([0., 0., 0., 0.]) #R = LUT, FF, BRAMs, DSP
-	R_max = np.array([277400, 554800, 1510, 2020]) #LUT_max, FF_max, BRAM_max, DSP_max
+	R = reset_R()
+	R_max = set_R_max() 
 
 	#R += windower_ramin(WINDOW=7, NO_CH=128) 
 	#R += bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=-1, level=1)
@@ -34,7 +35,5 @@ if __name__ == "__main__":
 	#logger(R, R_max)
 	#R = dense_layer_fp (INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=29, BW_W=2, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
 	#logger(R, R_max)
-	
-	R += conv_estimator()
-	logger(R, R_max)
-	#print (REG, ADD)
+
+	conv_tb(R_max)

@@ -245,47 +245,98 @@ def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16,
 
 
 
-def conv(K=3, Cin=64, Cout=64, Streams=1, Precision=16, Deep=1, file_add="../rt_amc_models/f64/srcs/conv1.sv", stat=True):
-	if stat:
-		return conv_stat(K=K, Cin=Cin, Cout=Cout, Streams=Streams, Precision=Precision, Deep=Deep)
+def conv(K=3, Cin=64, Cout=64, Precision=16, Deep=1, file_addr=None):
+
+	if file_addr == None:
+		return conv_stat(K=K, Cin=Cin, Cout=Cout, Precision=Precision, Deep=Deep)
 	else:
-		return conv_file(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False)		
+		return conv_file(file_addr=file_addr, Precision=Precision)		
 
-def conv_file(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
+def coder (in_str, neg, Precision=8, shift=2**14, bias=1):
+	comp = None
 
-	file = open(file_add, "r")
+	m = re.match(r"tree_(?P<index>\d+)", in_str)
+	if m != None:
+		comp = int(m.group('index')) + bias
+		if neg == True:
+			comp = comp * (-1)
 	
-	Width = 16
-	zero_s = '\( \$signed\( %d\'h0 \) \)' % Width
+	m = re.match(r"in\[(?P<index>\d+)\]", in_str)
+	if m != None: 
+		comp = int(m.group('index')) + bias
+		comp += shift
+		if neg == True:
+			comp = comp * (-1)
+	
+	zero = '%d\'h0' % Precision
+	if in_str == zero:
+		comp = 0
+
+	return comp
+
+def conv_file(file_addr="../rt_amc_models/f64/srcs/conv1.sv", Precision=16):
+
+	file = open(file_addr, "r")
+	serial_adder = False if (Precision == 16) else True
 
 	trees = []
-	tree_reg = []
+	regs = []
 	out_tree = []
 
+	neg_b = 0
+	a_comp = 0
+	b_comp = 0
+	c_tree_ind = 0
+
 	for line in file:
+		#print(line[0:-1])
+		
+		if serial_adder:
+			
+			m = re.search(r'\.neg_b\((?P<index>\d+)\),', line)
+			if m != None:
+				neg_b = int(m.group('index'))
 
-		signed_s = [m.start() for m in re.finditer('\( \$signed\(', line)]
-		len_s = len(signed_s)
+			m = re.search(r'\.a\((?P<index>[\w\[\]_\']+)\),', line)
+			if m != None:
+				a_buffer = coder(m.group('index'), neg=False, Precision=Precision)
 
-		signed_zero = [m.start() for m in re.finditer(zero_s, line)]
-		len_sz = len(signed_zero)
+			m = re.search(r'\.b\((?P<index>[\w\[\]_\']+)\),', line)
+			if m != None:
+				b_buffer = coder(m.group('index'), neg=neg_b, Precision=Precision)
 
-		if line[0:5] == "tree_":
-			print(line[0:-1])
+			m = re.search(r'\.c\((?P<index>[\w\[\]_\']+)\)', line)
+			if m != None:
+				# shift=0, bias=0 to reach the index
+				c_tree_ind = coder(m.group('index'), neg=False, Precision=Precision, shift=0, bias=0)
+				#print (c_tree_ind, "=", a_buffer, b_buffer,)
+				if b_buffer == 0:
+					add = 0
+					reg = 1 + 1/Precision
+					trees.append((c_tree_ind, a_buffer, add, reg, True))
+				else:
+					add = 1
+					reg = 1 + 1/Precision
+					trees.append((c_tree_ind, None, add, reg, False))
 
-			signed_e = signed_s[1:]
-			signed_e.append(len(line)-1)
-			print(signed_s)
-			print(signed_e)
+		else:
+			if line[0:5] == "tree_":
 
-			if len_s == 3:
-				if len_sz == 2:
+				signed_s = [m.start() for m in re.finditer('\( \$signed\(', line)]
+				len_s = len(signed_s)
+
+				zero = '\( \$signed\( %d\'h0 \) \)' % Precision
+				signed_zero = [m.start() for m in re.finditer(zero, line)]
+				len_sz = len(signed_zero)
+
+				signed_e = signed_s[1:]
+				signed_e.append(len(line)-1)
+
+				if ((len_s == 3) & (len_sz == 2)):
 
 					m = re.match(r"tree_(?P<index>\d+) <=", line[:signed_s[0]])
-					if m != None:
-						index = int(m.group('index'))
+					index = int(m.group('index'))
 					
-
 					m = re.match(r"\( \$signed\( tree_(?P<index>\d+) \) \)", line[signed_s[0]:signed_e[0]])
 					if m != None:
 						comp = int(m.group('index'))
@@ -296,70 +347,65 @@ def conv_file(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
 					m = re.match(r"\( \$signed\( in\[(?P<index>\d+)\] \) \)", line[signed_s[0]:signed_e[0]])
 					if m != None: 
 						comp = int(m.group('index'))
-						comp = (comp + 1) * (2**12)
+						comp = (comp + 1) + (2**14)
 						if line[signed_s[0]-2] == "-":
 							comp = comp * (-1)
 					
+					# It is an assumption that passing does not require LUTs. 
+					add = 1 if (comp < 0) else 0 
 					reg = 1
-					if comp < 0:		# It is an assumption
-						add = 1
-					else:
-						add = 0
 
 					trees.append((index, comp, add, reg, True))
-					print(index, comp, add, reg, True)
 
-				elif len_sz == 1:
+				elif ((len_s == 3) & (len_sz == 1)):
 					reg = 1
 					add = 1
 					index = None
 					comp = None
 					trees.append((index, comp, add, reg, False))
-					print(index, comp, add, reg, False)
 
 				else:
 					raise Exception("we don't expect this")
-			elif len_s != 0:
-				raise Exception("we don't expect this")
+
 
 		if line[0:3] == "reg":
-			m = re.match(r"reg \[(?P<reg_size>\d+):0\]\[15:0\] out_(?P<index>\d+);", line)
+			m = re.match(r"reg \[(?P<reg_size>\d+):0\]\[15:0\] out_(?P<out_index>\d+);", line)
+			
 			if m != None:
-				print(m.groupdict())
 				reg_size = int(m.group('reg_size')) + 1
-				tree_i = int(m.group('index'))
-				tree_reg.append((tree_i,reg_size))
+				out_index = int(m.group('out_index'))
+				regs.append((out_index,reg_size))
 
-			m = re.match(r"reg \[15:0\] out_(?P<index>\d+);", line)
+			m = re.match(r"reg \[15:0\] out_(?P<out_index>\d+);", line)
 			if m != None:
-				print(m.groupdict())
-				tree_i = int(m.group('index'))
-				tree_reg.append((tree_i,1))
+				out_index = int(m.group('out_index'))
+				regs.append((out_index,1))
 
 
 		if line[0:4] == "out_":
 			m = re.match(r"out_(?P<out_index>\d+) \<\= \{ out_(\d+)\[(\d+):(\d+)\], tree_(?P<tree_index>\d+)\};", line)
 			if m != None:
-				print(m.groupdict())
 				out_index = int(m.group('out_index'))
 				tree_index = int(m.group('tree_index'))
 				out_tree.append((out_index, tree_index))
+
 			m = re.match(r"out_(?P<out_index>\d+) \<\= tree_(?P<tree_index>\d+);", line)
 			if m != None:
-				print(m.groupdict())
 				out_index = int(m.group('out_index'))
 				tree_index = int(m.group('tree_index'))
 				out_tree.append((out_index, tree_index))
 
-		#if line[0:10] == "assign out":
-		#	m = re.match(r"out_(?P<out_index>\d+) \<\= \{ out_(\d+)\[(\d+):(\d+)\], tree_(?P<tree_index>\d+)\};", line)
+		if line[0:7] == "vld_reg":
+			m = re.match(r"vld_reg <= { vld_reg\[(?P<vld_reg>\d+):0\], vld_in };", line)
+			vld_reg = int(m.group('vld_reg'))
 
-	for i in trees:
-		print(i)
+		if line[0:7] == "rst_reg":
+			m = re.match(r"rst_reg <= resets\[(?P<rst_reg>\d+):0\];", line)
+			rst_reg = int(m.group('rst_reg'))
 
+	##########################################
 	ADD = sum([add for (index, comp, add, reg, flag) in trees if (flag == False)])
 	REG = sum([reg for (index, comp, add, reg, flag) in trees if (flag == False)])
-	print(ADD, REG)
 	
 	tree_comp = [(comp, add) for (index, comp, add, reg, flag) in trees if (flag == True)]
 	tree_comp = list(set(tree_comp))
@@ -368,35 +414,26 @@ def conv_file(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
 	tree_comp = [(comp, reg) for (index, comp, add, reg, flag) in trees if (flag == True)]
 	tree_comp = list(set(tree_comp))
 	REG += sum([reg for (comp, reg) in tree_comp])
-
 	 
-	for reg_ind, reg_size in tree_reg:
-		tree_ind = [tree_index for (out_index, tree_index) in out_tree if (out_index == reg_ind)]
-		tree_ind = tree_ind[0]
+	for reg_ind, reg_size in regs:
+		related_tree_ind = [tree_index for (out_index, tree_index) in out_tree if (out_index == reg_ind)]
+		related_tree_ind = related_tree_ind[0]
 
-		comp_tree_ind = [comp for (index, comp, add, reg, flag) in trees if ((index == tree_ind) & (flag == True)) ]
+		comp_tree_ind = [comp for (index, comp, add, reg, flag) in trees if ((index == related_tree_ind) & (flag == True)) ]
 		if len(comp_tree_ind) != 0:
 			comp_tree_ind = comp_tree_ind[0]
 			if comp_tree_ind != None:
 				tree_indexs_same_comp = [index for (index, comp, add, reg, flag) in trees if ((comp == comp_tree_ind) & (flag == True)) ]
-				print(tree_indexs_same_comp)
+				#print(tree_indexs_same_comp)
 				reg_indexs = [out_index for (out_index, tree_index) in out_tree if (tree_index in tree_indexs_same_comp)]
-				reg_sizes = [reg_size for (reg_ind, reg_size) in tree_reg if (reg_ind in reg_indexs) ]
-				REG += max(reg_sizes)/len(reg_sizes)
+				reg_sizes = [reg_size for (reg_ind, reg_size) in regs if (reg_ind in reg_indexs) ]
+				REG += max(reg_sizes)/len(reg_indexs)
 
-		#	comp_sim_ind = [i for i, e in enumerate(tree_comp) if ((e == comp) & (i > ind))]
-
-		#	if len(comp_sim_ind) == 0:
-		#		REG += reg_size
-		#	else:
-		#		m_cost = max(tree_comp(i)) for i in comp_sim_ind
-		#		if m_cost >= comp
-
-	LUT = ADD * Width	# tree_ & out_
+	LUT = ADD * Precision	# tree_ & out_
 	
-	FF = int(REG) * Width	# tree_
-	FF += 6 			# rst_reg
-	FF += 7 			# vld_reg
+	FF = int(REG) * Precision	# tree_
+	FF += vld_reg 			# rst_reg
+	FF += rst_reg 			# vld_reg
 
 	DSP = 0.0
 	BRAM = 0.0
@@ -404,22 +441,22 @@ def conv_file(file_add="../rt_amc_models/f64/srcs/conv1.sv", DEBUG=False):
 	return np.array([LUT, FF, BRAM, DSP])
 
 
-def conv_stat(K, Cin, Cout, Streams=1, Precision=16, Deep=1):
+def conv_stat(K, Cin, Cout, Precision, Deep):
 	# Deep = 1, for the very first layer
 	# Deep = 2, neither very first and last two convs
 	# Deep = 3, for the last two convs
+	Total = K * Cin * Cout * Precision
 
-	Total = K * Cin * Cout * Streams * Precision
-
+	# extracted by f64, f96, f128 cases
 	if Deep == 1:
-		LUT_facor = 0.06
+		LUT_facor = 0.12
 	elif Deep == 2:
 		LUT_facor = 0.13
 	else:
 		LUT_facor = 0.25
 
 	if Deep == 1:
-		FF_facor = 0.26
+		FF_facor = 0.51
 	elif Deep == 2:
 		FF_facor = 0.19
 	else:
