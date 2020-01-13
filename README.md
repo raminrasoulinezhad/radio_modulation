@@ -113,6 +113,33 @@ Forward log to a file:
 	
 	./script.sh 2>&1 | tee script.rpt
 
+Classes
+
+	0) OOK,
+	1) 4ASK,
+	2) 8ASK,
+	3) BPSK,
+	4) QPSK,
+	5) 8PSK,
+	6) 16PSK,
+	7) 32PSK,
+	8) 16APSK,
+	9) 32APSK,
+	10) 64APSK,
+	11) 128APSK,
+	12) 16QAM,
+	13) 32QAM,
+	14) 64QAM,
+	15) 128QAM,
+	16) 256QAM,
+	17) AM-SSB-WC,
+	18) AM-SSB-SC,
+	19) AM-DSB-WC,
+	20) AM-DSB-SC,
+	21) FM,
+	22) GMSK,
+	23) OQPSK
+
 Sed (Sid :) 
 
 	cat ./*  | grep "CLB LUTs" | sed -e "s/[^0-9.]/ /g" -e "s/  */ /g" | sed "s/ *//" | sed "s/ /\n/" | sed -n 1~2p
