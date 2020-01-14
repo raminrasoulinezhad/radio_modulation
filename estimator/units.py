@@ -29,7 +29,7 @@ def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=T
 	LUT += 2 * L2_PAD 				# two comparators 
 	LUT += LOG2_IMG_SIZE - L2_TPUT 	# counter adder
 
-	FF = NO_CH * WINDOW 			#window_mem
+	FF = NO_CH * WINDOW 			# window_mem
 	FF += 2 						# state
 	FF += LOG2_IMG_SIZE - L2_TPUT 	# cntr
 	FF += L2_PAD + 1 				# remaining
@@ -40,6 +40,33 @@ def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=T
 	
 	return np.array([LUT, FF, BRAM, DSP])
 	
+def windower_serial_ramin(NO_CH=2, LOG2_IMG_SIZE=10, WINDOW=3, SER_CYC=1):
+	### important notes
+	# NO_CH = Cin * input_width While input_width is adder size
+	# SER_CYC: must be a power of 2
+
+	LOG2_SER = int(np.ceil(np.log2(SER_CYC)))
+	LOG2_W_S = int(np.ceil(np.log2(WINDOW)))
+	CNTR_MAX = 2**(LOG2_IMG_SIZE+LOG2_SER);
+	PAD = SER_CYC * ((WINDOW-1)/2)
+
+	LUT = NO_CH								# window_mem_a multiplexers
+	LUT += LOG2_SER + LOG2_W_S				# remaining subtracter
+	LUT += (LOG2_IMG_SIZE + LOG2_SER) + 4	# cntr comparator and adder 
+	LUT += 1								# ser_rst (can not be more than a LUT normally)
+
+	FF = NO_CH								# window_mem_a
+	FF += (WINDOW-1) * SER_CYC * NO_CH		# window_mem
+	FF += LOG2_IMG_SIZE + LOG2_SER			# cntr
+	FF += LOG2_SER + LOG2_W_S				# remaining
+	FF += 2 								# state
+	FF += 1 								# vld_out
+
+	BRAM = 0.0
+	DSP = 0.0
+	
+	return np.array([LUT, FF, BRAM, DSP])
+
 def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=-1):
 
 	BITS_MAX = R_SHIFT if ( R_SHIFT > BW_A ) else BW_A;
@@ -465,7 +492,11 @@ def ConvLayer(WINDOW=3, Cin=2, Cout=64, act_in=16, Adder_W=16, THROUGHPUT=1, L2_
 	if Adder_W != act_in:
 		# Serial adder is used 
 		R = to_serial(NO_CH=Cin, BW_IN=act_in, BW_OUT=Adder_W)
-		R += windower_serial()
+
+		SER_CYC = act_in/Adder_W
+		assert (np.log2(SER_CYC).is_integer())
+		SER_CYC = int(SER_CYC)
+		R += windower_serial_ramin(NO_CH=Cin*Adder_W, LOG2_IMG_SIZE=L2_IMG, WINDOW=WINDOW, SER_CYC=SER_CYC)
 	else:
 		# windower
 		R = windower_ramin(WINDOW=WINDOW, NO_CH=Cin, LOG2_IMG_SIZE=L2_IMG, THROUGHPUT=THROUGHPUT, PADDDING=True)
@@ -482,7 +513,7 @@ def ConvLayer(WINDOW=3, Cin=2, Cout=64, act_in=16, Adder_W=16, THROUGHPUT=1, L2_
 	
 	return R
 
-def FCLayer(Cin=64, Cout=128, Precision=16, bn_en=True):
+def FCLayer(Cin=64, Cout=128, Precision=16, bn_en=True, BW_A=6, BW_B=18, R_SHIFT=8):
 	print("Warning: FCLayer is validated")
 
 	R = to_serial(NO_CH=Cin, BW_IN=16, BW_OUT=Precision)
@@ -490,7 +521,7 @@ def FCLayer(Cin=64, Cout=128, Precision=16, bn_en=True):
 	R += dense_layer_fp(INPUT_SIZE=Precision, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
 
 	if bn_en:
-		R += bn(NO_CH=Cout, BW_IN=Precision, BW_A=BN_BW_A, BW_B=BN_BW_B, BW_OUT=Precision, R_SHIFT=BN_R_SHIFT, MAXVAL=-1)
+		R += bn(NO_CH=Cout, BW_IN=Precision, BW_A=BW_A, BW_B=BW_B, BW_OUT=Precision, R_SHIFT=R_SHIFT, MAXVAL=-1)
 
 	return R
 
@@ -518,6 +549,6 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[128
 		R += ConvLayer(WINDOW=WINDOW[i], Cin=Cin[i], Cout=Cout[i], act_in=act_in, Adder_W=Adder_W[i], THROUGHPUT=THROUGHPUT[i], L2_IMG=L2_IMG, Deep=Deep, BN_BW_A=BN_BW_A[i], BN_BW_B=BN_BW_B[i], BN_R_SHIFT=BN_R_SHIFT[i])
 
 	for i in range(n_fc):
-		R += FCLayer(Cin=Cin[n_conv+i], Cout=Cout[n_conv+i], Precision=Precision[n_conv+i], bn_en=(i != (n_fc-1)))
+		R += FCLayer(Cin=Cin[n_conv+i], Cout=Cout[n_conv+i], Precision=act_in, bn_en=(i != (n_fc-1)), BW_A=BN_BW_A[n_conv+i], BW_B=BN_BW_B[n_conv+i], R_SHIFT=BN_R_SHIFT[n_conv+i])
 
 	return R

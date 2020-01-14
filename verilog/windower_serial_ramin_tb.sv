@@ -4,7 +4,7 @@ module windower_serial_ramin_tb();
 
 	parameter PARALLEL_WIDTH = 16;
 	parameter SERIAL_WIDTH = 4;
-	parameter NO_CH = 16;
+	parameter NO_CH = 4;
 	parameter NO_CH_IN = NO_CH * SERIAL_WIDTH;
 
 	parameter LOG2_IMG_SIZE = 5;
@@ -58,11 +58,27 @@ module windower_serial_ramin_tb();
 		end
 
 		@(posedge clk) #clk_p2 vld_in = 0;
-
-		repeat (10)  begin
+		repeat (20)  begin
 			@(posedge clk)
 			#clk_p2 vld_in = 0;
 		end 
+
+
+		repeat (2**(LOG2_IMG_SIZE+LOG2_SER)) begin 
+			@(posedge clk) begin
+				data_in = {NO_CH{count}};
+				count = count + 1;
+				i = i + 1;
+				#clk_p2 vld_in = 1;
+			end
+		end
+
+		@(posedge clk) #clk_p2 vld_in = 0;
+		repeat (20)  begin
+			@(posedge clk)
+			#clk_p2 vld_in = 0;
+		end 
+
 		$stop;
 
 	end

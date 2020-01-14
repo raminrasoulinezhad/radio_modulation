@@ -38,4 +38,5 @@ if __name__ == "__main__":
 
 	#conv_tb(R_max)
 
-	tw_vgg_2iq()
+	R += tw_vgg_2iq()
+	logger(R, R_max)
