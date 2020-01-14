@@ -2,6 +2,8 @@ import numpy as np
 import warnings
 import re
 
+from utils import *
+
 def multiplier_cost (a, b):
 	LUT = 0
 	DSP = 0
@@ -17,40 +19,34 @@ def multiplier_cost (a, b):
 
 	return np.array([LUT, 0, 0, DSP])
 
-def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, 
-	THROUGHPUT=1, PADDDING=True, level=1):
+def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=True):
 	
 	L2_TPUT = int(np.ceil(np.log2(THROUGHPUT)))
 	PAD = int( ((WINDOW-1)/2) if PADDDING else 0)
 	L2_PAD = int(np.ceil(np.log2(PAD)))
 
 	LUT = NO_CH * THROUGHPUT
-	if level > 0:
-		LUT += 2 * L2_PAD 				# two comparators 
-		LUT += LOG2_IMG_SIZE - L2_TPUT 	# counter adder
+	LUT += 2 * L2_PAD 				# two comparators 
+	LUT += LOG2_IMG_SIZE - L2_TPUT 	# counter adder
 
-	FF = NO_CH * WINDOW 				#window_mem
-	if level > 0:
-		FF += 2 						# state
-		FF += LOG2_IMG_SIZE - L2_TPUT 	# cntr
-		FF += L2_PAD + 1 				# remaining
-		FF += 1 						# vld_out
+	FF = NO_CH * WINDOW 			#window_mem
+	FF += 2 						# state
+	FF += LOG2_IMG_SIZE - L2_TPUT 	# cntr
+	FF += L2_PAD + 1 				# remaining
+	FF += 1 						# vld_out
 
-	BRAM = 0
-	DSP = 0
+	BRAM = 0.0
+	DSP = 0.0
 	
 	return np.array([LUT, FF, BRAM, DSP])
 	
-def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, 
-	R_SHIFT=6, MAXVAL=-1, level=1):
+def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=-1):
 
 	BITS_MAX = R_SHIFT if ( R_SHIFT > BW_A ) else BW_A;
 
 	LUT = 0 
 	# will be captured by DSP 
 	# LUT += BW_OUT * NO_CH
-	if level > 0:
-		LUT += 0
 
 	FF_i = 1 * BW_OUT 					#relu_i 			
 	# will capture by DSP registers: 	mult_i(BW_IN+BITS_MAX), bias_i(BW_IN+BITS_MAX), shift_i(BW_OUT)
@@ -59,16 +55,14 @@ def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12,
 	FF_i += BW_OUT						# data_out
 
 	FF = FF_i * NO_CH
-
-	if level > 0:
-		FF += 4		#vld_sr
+	FF += 4								#vld_sr
 
 	BRAM = 0
 	DSP = NO_CH
 	
 	return np.array([LUT, FF, BRAM, DSP])
 
-def from_serial(NO_CH=10, BW_IN=2, BW_OUT=8, level=1):
+def from_serial(NO_CH=10, BW_IN=2, BW_OUT=8):
 
 	NO_CYC = int(np.ceil(BW_OUT/BW_IN))
 	CNTR_BW = int(np.log2(NO_CYC))
@@ -76,16 +70,15 @@ def from_serial(NO_CH=10, BW_IN=2, BW_OUT=8, level=1):
 	LUT = CNTR_BW	# comparator + adder
 
 	FF = BW_OUT * NO_CH
-	if level > 0:
-		FF += 1 		# vld_reg		
-		FF += CNTR_BW	# vld_cntr
+	FF += 1 		# vld_reg		
+	FF += CNTR_BW	# vld_cntr
 
 	BRAM = 0
 	DSP = 0
 	
 	return np.array([LUT, FF, BRAM, DSP])
 
-def maxpool_ramin(NO_CH=10, BW_IN=12, SER_BW=4, level=1):
+def maxpool_ramin(NO_CH=10, BW_IN=12, SER_BW=4):
 
 	BUF_CYC = 2 * (BW_IN / SER_BW)			
 	DATA_SIZE = BW_IN						
@@ -94,16 +87,14 @@ def maxpool_ramin(NO_CH=10, BW_IN=12, SER_BW=4, level=1):
 	LATENCY = 3
 
 	LUT = NO_CH * DATA_SIZE		# comparator
-	if level > 0:
-		LUT += BUF_CYC 			# comparator
+	LUT += BUF_CYC 				# comparator
 
 	FF = NO_CH * BUF_SIZE		# input_buffer
 	FF += NO_CH * BUF_SIZE		# dly
 	FF += NO_CH * 1				# max_flag
 	FF += NO_CH * BW_IN			# max_x
-	if level > 0:
-		FF += LATENCY			# vld_sr
-		FF += CNTR_SIZE + 1		# cntr_vld
+	FF += LATENCY				# vld_sr
+	FF += CNTR_SIZE + 1			# cntr_vld
 
 	BRAM = 0
 	DSP = 0
@@ -111,17 +102,15 @@ def maxpool_ramin(NO_CH=10, BW_IN=12, SER_BW=4, level=1):
 	return np.array([LUT, FF, BRAM, DSP])
 
 
-def to_serial(NO_CH=10, BW_IN=8, BW_OUT=2, level=1):
+def to_serial(NO_CH=10, BW_IN=8, BW_OUT=2):
 
 	NO_CYC = int(np.ceil(BW_IN/BW_OUT))
 
 	LUT = NO_CH * ((BW_IN-BW_OUT)/2)	# shift register circuits
-	if level > 0:
-		LUT += NO_CYC/2					# reloading vld_sr
+	LUT += NO_CYC/2						# reloading vld_sr
 
 	FF = NO_CH * BW_IN 					# tmp_in
-	if level > 0:	
-		FF += NO_CYC					# vld_sr
+	FF += NO_CYC						# vld_sr
 
 	BRAM = 0
 	DSP = 0
@@ -129,7 +118,7 @@ def to_serial(NO_CH=10, BW_IN=8, BW_OUT=2, level=1):
 	return np.array([LUT, FF, BRAM, DSP])
 
 
-def serial_adder(BW=16, level=1):
+def serial_adder(BW=16):
 
 	LUT = BW  		# adder
 	LUT += 1		# logic of carry
@@ -245,12 +234,12 @@ def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16,
 
 
 
-def conv(K=3, Cin=64, Cout=64, Precision=16, Deep=1, file_addr=None):
+def conv(K=3, Cin=64, Cout=64, act_in=16, Deep=1, file_addr=None):
 
 	if file_addr == None:
-		return conv_stat(K=K, Cin=Cin, Cout=Cout, Precision=Precision, Deep=Deep)
+		return conv_stat(K=K, Cin=Cin, Cout=Cout, Precision=act_in, Deep=Deep)
 	else:
-		return conv_file(file_addr=file_addr, Precision=Precision)		
+		return conv_file(file_addr=file_addr, Precision=act_in)		
 
 def coder (in_str, neg, Precision=8, shift=2**14, bias=1):
 	comp = None
@@ -462,10 +451,73 @@ def conv_stat(K, Cin, Cout, Precision, Deep):
 	else:
 		FF_facor = 0.30
 
-	LUT = Total * LUT_facor
-	FF = Total * FF_facor
+	LUT = np.floor(Total * LUT_facor)
+	FF = np.floor(Total * FF_facor)
 	DSP = 0.0
 	BRAM = 0.0
 
 	return np.array([LUT, FF, BRAM, DSP])
 	
+
+def ConvLayer(WINDOW=3, Cin=2, Cout=64, act_in=16, Adder_W=16, THROUGHPUT=1, L2_IMG=10, Deep=1, file_addr=None, BN_BW_A=11, BN_BW_B=15, 
+	BN_R_SHIFT=8, BN_BW_IN=16, BN_BW_OUT=16):
+	
+	if Adder_W != act_in:
+		# Serial adder is used 
+		R = to_serial(NO_CH=Cin, BW_IN=act_in, BW_OUT=Adder_W)
+		R += windower_serial()
+	else:
+		# windower
+		R = windower_ramin(WINDOW=WINDOW, NO_CH=Cin, LOG2_IMG_SIZE=L2_IMG, THROUGHPUT=THROUGHPUT, PADDDING=True)
+	
+	# Conv(s)
+	for i in range(THROUGHPUT):
+		R += conv(K=WINDOW, Cin=Cin, Cout=Cout, act_in=Adder_W, Deep=Deep, file_addr=None)
+
+	# MaxPool
+	R += maxpool_ramin(NO_CH=Cout, BW_IN=BN_BW_IN, SER_BW=THROUGHPUT*Adder_W)
+
+	# bn
+	R += bn(NO_CH=Cout, BW_IN=BN_BW_IN, BW_A=BN_BW_A, BW_B=BN_BW_B, BW_OUT=BN_BW_OUT, R_SHIFT=BN_R_SHIFT, MAXVAL=-1)
+	
+	return R
+
+def FCLayer(Cin=64, Cout=128, Precision=16, bn_en=True):
+	print("Warning: FCLayer is validated")
+
+	R = to_serial(NO_CH=Cin, BW_IN=16, BW_OUT=Precision)
+
+	R += dense_layer_fp(INPUT_SIZE=Precision, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
+
+	if bn_en:
+		R += bn(NO_CH=Cout, BW_IN=Precision, BW_A=BN_BW_A, BW_B=BN_BW_B, BW_OUT=Precision, R_SHIFT=BN_R_SHIFT, MAXVAL=-1)
+
+	return R
+
+def deep_factor(i, n_conv):
+	if i == 0:
+		Deep = 1
+	elif i < n_conv-2:
+		Deep = 2
+	else:
+		Deep = 3
+	return Deep
+
+def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[128,128,24], 
+	WINDOW=[3]*7, THROUGHPUT=[2]+[1]*6, BN_BW_A=[11,9,8,8,8,8,7, 6,7,None], BN_BW_B=[15,17,18,17,16,17,17, 18,18,None], n_conv=7, n_fc=3):
+	print("Warning: tw_vgg_2iq is validated")
+
+	BN_R_SHIFT = [8] * (n_conv + n_fc)
+
+	R = reset_R()
+
+	Cin = [2] + Cout
+
+	for i in range(n_conv):
+		Deep = deep_factor(i, n_conv)
+		R += ConvLayer(WINDOW=WINDOW[i], Cin=Cin[i], Cout=Cout[i], act_in=act_in, Adder_W=Adder_W[i], THROUGHPUT=THROUGHPUT[i], L2_IMG=L2_IMG, Deep=Deep, BN_BW_A=BN_BW_A[i], BN_BW_B=BN_BW_B[i], BN_R_SHIFT=BN_R_SHIFT[i])
+
+	for i in range(n_fc):
+		R += FCLayer(Cin=Cin[n_conv+i], Cout=Cout[n_conv+i], Precision=Precision[n_conv+i], bn_en=(i != (n_fc-1)))
+
+	return R

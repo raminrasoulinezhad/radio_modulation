@@ -36,4 +36,6 @@ if __name__ == "__main__":
 	#R = dense_layer_fp (INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=29, BW_W=2, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
 	#logger(R, R_max)
 
-	conv_tb(R_max)
+	#conv_tb(R_max)
+
+	tw_vgg_2iq()
