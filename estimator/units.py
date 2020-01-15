@@ -555,21 +555,16 @@ def deep_factor(i, n_conv):
 
 def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512,512,24], 
 	WINDOW=[3]*7, THROUGHPUT=[2]+[1]*6, BN_BW_A=[11,9,8,8,8,8,7, 6,7,None], 
-	BN_BW_B=[15,17,18,17,16,17,17, 18,18,None], n_conv=7, n_fc=3, DEBUG=True):
+	BN_BW_B=[15,17,18,17,16,17,17, 18,18,None], n_conv=7, n_fc=3):
 
 	BN_R_SHIFT = [8] * (n_conv + n_fc - 1 ) + [None] 
 	D_SHIFT = [0,0,6]
-
-	R = reset_R()
+	D_BW_W = [2,2,16]
 
 	Cin = [2] + Cout
 	Cin[n_conv] = 2**(L2_IMG - n_conv) * Cout[n_conv-1]
-	if DEBUG:
-		print(Cout)
-		print(Cin)
 
-	D_BW_W = [2,2,16]
-
+	R = reset_R()
 	for i in range(n_conv):
 		Deep = deep_factor(i, n_conv)
 		print("Conv %d:   " % (i), WINDOW[i], Cin[i], Cout[i], act_in, Adder_W[i], THROUGHPUT[i], L2_IMG-i, Deep, BN_BW_A[i], BN_BW_B[i], BN_R_SHIFT[i])

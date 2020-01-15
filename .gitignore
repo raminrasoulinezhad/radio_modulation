@@ -121,6 +121,7 @@ rt_amc_models
 
 ModelSim/
 Vivado_test/
+Vivado_test2/
 
 train_tnn/test_pred.csv
 Synthesis_Implementation_tests/experiments*
