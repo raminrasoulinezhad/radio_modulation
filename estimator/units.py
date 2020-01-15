@@ -68,6 +68,7 @@ def windower_serial_ramin(NO_CH=2, LOG2_IMG_SIZE=10, WINDOW=3, SER_CYC=1):
 	return np.array([LUT, FF, BRAM, DSP])
 
 def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=-1):
+	# Note, A and B values are saved in DSP registers by defaults.
 
 	BITS_MAX = R_SHIFT if ( R_SHIFT > BW_A ) else BW_A;
 
@@ -86,6 +87,7 @@ def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=-1):
 
 	BRAM = 0
 	DSP = NO_CH
+	#print(DSP)
 	
 	return np.array([LUT, FF, BRAM, DSP])
 
@@ -164,8 +166,6 @@ def popcount_accumulate ():
 
 def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
-	warnings.warn("Warning: Inaccurate result (pipelined_accumulator)")
-
 	#INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
 	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else OUT_BITWIDTH
 	
@@ -196,8 +196,6 @@ def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
 def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2, 
 	R_SHIFT=0, USE_UNSIGNED_DATA=0, NUM_CYC=32, full_precision=True):
-
-	warnings.warn("Warning: Inaccurate result (multiply_accumulate_fp)")
 
 	# This number is designed for full precision
 	# The reported number is the maximum resource usage
@@ -230,8 +228,6 @@ def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2,
 
 def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16, 
 	R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128):
-	
-	warnings.warn("Warning: Inaccurate result (dense_layer_fp)")
 
 	LOG2_NO_VECS = int(np.ceil(np.log2(INPUT_SIZE)))
 	VLD_SR_LEN = LOG2_NO_VECS + 3
@@ -513,12 +509,11 @@ def ConvLayer(WINDOW=3, Cin=2, Cout=64, act_in=16, Adder_W=16, THROUGHPUT=1, L2_
 	
 	return R
 
-def FCLayer(Cin=64, Cout=128, Precision=16, bn_en=True, BW_A=6, BW_B=18, R_SHIFT=8):
-	print("Warning: FCLayer is validated")
+def FCLayer(Cin=64, Cout=128, Precision=16, D_IN_SIZE=1, D_CYC=512, D_BW_W=2, D_SHIFT=0, bn_en=True, BW_A=6, BW_B=18, R_SHIFT=8):
+	# flatten
+	R = to_serial(NO_CH=1, BW_IN=Precision*Cin, BW_OUT=Precision*D_IN_SIZE)
 
-	R = to_serial(NO_CH=Cin, BW_IN=16, BW_OUT=Precision)
-
-	R += dense_layer_fp(INPUT_SIZE=Precision, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16, R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128)
+	R += dense_layer_fp(INPUT_SIZE=D_IN_SIZE, NUM_CYC=D_CYC, BW_IN=Precision, BW_OUT=Precision, BW_W=D_BW_W, R_SHIFT=D_SHIFT, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=Cout)
 
 	if bn_en:
 		R += bn(NO_CH=Cout, BW_IN=Precision, BW_A=BW_A, BW_B=BW_B, BW_OUT=Precision, R_SHIFT=R_SHIFT, MAXVAL=-1)
@@ -535,20 +530,29 @@ def deep_factor(i, n_conv):
 	return Deep
 
 def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[128,128,24], 
-	WINDOW=[3]*7, THROUGHPUT=[2]+[1]*6, BN_BW_A=[11,9,8,8,8,8,7, 6,7,None], BN_BW_B=[15,17,18,17,16,17,17, 18,18,None], n_conv=7, n_fc=3):
-	print("Warning: tw_vgg_2iq is validated")
+	WINDOW=[3]*7, THROUGHPUT=[2]+[1]*6, BN_BW_A=[11,9,8,8,8,8,7, 6,7,None], 
+	BN_BW_B=[15,17,18,17,16,17,17, 18,18,None], n_conv=7, n_fc=3, DEBUG=True):
 
-	BN_R_SHIFT = [8] * (n_conv + n_fc)
+	BN_R_SHIFT = [8] * (n_conv + n_fc - 1 ) + [None] 
+	D_SHIFT = [0,0,6]
 
 	R = reset_R()
 
 	Cin = [2] + Cout
+	Cin[n_conv] = 2**(L2_IMG - n_conv) * Cout[n_conv-1]
+	if DEBUG:
+		print(Cout)
+		print(Cin)
+
+	D_BW_W = [2,2,16]
 
 	for i in range(n_conv):
 		Deep = deep_factor(i, n_conv)
-		R += ConvLayer(WINDOW=WINDOW[i], Cin=Cin[i], Cout=Cout[i], act_in=act_in, Adder_W=Adder_W[i], THROUGHPUT=THROUGHPUT[i], L2_IMG=L2_IMG, Deep=Deep, BN_BW_A=BN_BW_A[i], BN_BW_B=BN_BW_B[i], BN_R_SHIFT=BN_R_SHIFT[i])
-
+		print("Conv %d:   " % (i), WINDOW[i], Cin[i], Cout[i], act_in, Adder_W[i], THROUGHPUT[i], L2_IMG-i, Deep, BN_BW_A[i], BN_BW_B[i], BN_R_SHIFT[i])
+		R += ConvLayer(WINDOW=WINDOW[i], Cin=Cin[i], Cout=Cout[i], act_in=act_in, Adder_W=Adder_W[i], THROUGHPUT=THROUGHPUT[i], L2_IMG=L2_IMG-i, Deep=Deep, BN_BW_A=BN_BW_A[i], BN_BW_B=BN_BW_B[i], BN_R_SHIFT=BN_R_SHIFT[i])
+	
 	for i in range(n_fc):
-		R += FCLayer(Cin=Cin[n_conv+i], Cout=Cout[n_conv+i], Precision=act_in, bn_en=(i != (n_fc-1)), BW_A=BN_BW_A[n_conv+i], BW_B=BN_BW_B[n_conv+i], R_SHIFT=BN_R_SHIFT[n_conv+i])
+		print ("FC %d:   " % (i), Cin[n_conv+i], Cout[n_conv+i], act_in, (i != (n_fc-1)), BN_BW_A[n_conv+i], BN_BW_B[n_conv+i], BN_R_SHIFT[n_conv+i])
+		R += FCLayer(Cin=Cin[n_conv+i], Cout=Cout[n_conv+i], Precision=act_in, D_BW_W=D_BW_W[i], D_SHIFT=D_SHIFT[i], bn_en=(i != (n_fc-1)), BW_A=BN_BW_A[n_conv+i], BW_B=BN_BW_B[n_conv+i], R_SHIFT=BN_R_SHIFT[n_conv+i])
 
 	return R
