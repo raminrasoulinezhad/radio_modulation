@@ -19,6 +19,30 @@ def multiplier_cost (a, b):
 
 	return np.array([LUT, 0, 0, DSP])
 
+def width_divider(in_w, times):
+	for i in range(times):
+		in_w = int(np.floor(in_w / 2))
+	if in_w < 1:
+		in_w = 1
+	return in_w
+
+def BRAM_mapper (H, W):
+	H_l2 = int(np.ceil(np.log2(H)))
+
+	if H_l2 <= 9:
+		BRAM_W = 36
+		hight_rate = 1
+	elif H_l2 <= 14:
+		BRAM_W = width_divider(36, H_l2-9)
+		hight_rate = 1
+	elif H_l2 >= 15:
+		BRAM_W = 1
+		hight_rate = 2**(H_l2-16)
+
+	width_rate = int (np.ceil(W / BRAM_W))
+
+	return width_rate * hight_rate
+
 def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=True):
 	
 	L2_TPUT = int(np.ceil(np.log2(THROUGHPUT)))
@@ -240,7 +264,7 @@ def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16,
 	FF += LOG2_CYC				# cntr
 	FF += VLD_SR_LEN			# vld_sr
 
-	BRAM = 0
+	BRAM = OUTPUT_SIZE/2
 	DSP = 0
 
 	temp = OUTPUT_SIZE * multiply_accumulate_fp(LOG2_NO_VECS=LOG2_NO_VECS, 
@@ -529,7 +553,7 @@ def deep_factor(i, n_conv):
 		Deep = 3
 	return Deep
 
-def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[128,128,24], 
+def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512,512,24], 
 	WINDOW=[3]*7, THROUGHPUT=[2]+[1]*6, BN_BW_A=[11,9,8,8,8,8,7, 6,7,None], 
 	BN_BW_B=[15,17,18,17,16,17,17, 18,18,None], n_conv=7, n_fc=3, DEBUG=True):
 

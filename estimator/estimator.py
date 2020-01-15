@@ -40,3 +40,8 @@ if __name__ == "__main__":
 
 	R += tw_vgg_2iq()
 	logger(R, R_max)
+
+	
+	print(BRAM_mapper (512, 512*2))
+	print(BRAM_mapper (512, 512*2))
+	print(BRAM_mapper (512, 24*16))
