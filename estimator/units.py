@@ -43,13 +43,16 @@ def BRAM_mapper (H, W):
 
 	return width_rate * hight_rate
 
-def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=True):
+def windower_flex(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=True):
 	
 	L2_TPUT = int(np.ceil(np.log2(THROUGHPUT)))
 	PAD = int( ((WINDOW-1)/2) if PADDDING else 0)
 	L2_PAD = int(np.ceil(np.log2(PAD)))
 
 	LUT = NO_CH * THROUGHPUT
+	if (WINDOW == 3):
+		# Synthesis uses LUT4 which can be packed by 2X 
+		LUT = int(LUT / 2)
 	LUT += 2 * L2_PAD 				# two comparators 
 	LUT += LOG2_IMG_SIZE - L2_TPUT 	# counter adder
 
@@ -64,7 +67,7 @@ def windower_ramin(WINDOW=3, NO_CH=2, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=T
 	
 	return np.array([LUT, FF, BRAM, DSP])
 	
-def windower_serial_ramin(NO_CH=2, LOG2_IMG_SIZE=10, WINDOW=3, SER_CYC=1):
+def windower_serial_flex(NO_CH=2, LOG2_IMG_SIZE=10, WINDOW=3, SER_CYC=1):
 	### important notes
 	# NO_CH = Cin * input_width While input_width is adder size
 	# SER_CYC: must be a power of 2
@@ -131,7 +134,7 @@ def from_serial(NO_CH=10, BW_IN=2, BW_OUT=8):
 	
 	return np.array([LUT, FF, BRAM, DSP])
 
-def maxpool_ramin(NO_CH=10, BW_IN=12, SER_BW=4):
+def maxpool_flex(NO_CH=10, BW_IN=12, SER_BW=4):
 
 	BUF_CYC = 2 * (BW_IN / SER_BW)			
 	DATA_SIZE = BW_IN						
@@ -516,17 +519,17 @@ def ConvLayer(WINDOW=3, Cin=2, Cout=64, act_in=16, Adder_W=16, THROUGHPUT=1, L2_
 		SER_CYC = act_in/Adder_W
 		assert (np.log2(SER_CYC).is_integer())
 		SER_CYC = int(SER_CYC)
-		R += windower_serial_ramin(NO_CH=Cin*Adder_W, LOG2_IMG_SIZE=L2_IMG, WINDOW=WINDOW, SER_CYC=SER_CYC)
+		R += windower_serial_flex(NO_CH=Cin*Adder_W, LOG2_IMG_SIZE=L2_IMG, WINDOW=WINDOW, SER_CYC=SER_CYC)
 	else:
 		# windower
-		R = windower_ramin(WINDOW=WINDOW, NO_CH=Cin, LOG2_IMG_SIZE=L2_IMG, THROUGHPUT=THROUGHPUT, PADDDING=True)
+		R = windower_flex(WINDOW=WINDOW, NO_CH=Cin, LOG2_IMG_SIZE=L2_IMG, THROUGHPUT=THROUGHPUT, PADDDING=True)
 	
 	# Conv(s)
 	for i in range(THROUGHPUT):
 		R += conv(K=WINDOW, Cin=Cin, Cout=Cout, act_in=Adder_W, Deep=Deep, file_addr=None)
 
 	# MaxPool
-	R += maxpool_ramin(NO_CH=Cout, BW_IN=BN_BW_IN, SER_BW=THROUGHPUT*Adder_W)
+	R += maxpool_flex(NO_CH=Cout, BW_IN=BN_BW_IN, SER_BW=THROUGHPUT*Adder_W)
 
 	# bn
 	R += bn(NO_CH=Cout, BW_IN=BN_BW_IN, BW_A=BN_BW_A, BW_B=BN_BW_B, BW_OUT=BN_BW_OUT, R_SHIFT=BN_R_SHIFT, MAXVAL=-1)
@@ -575,3 +578,31 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 		R += FCLayer(Cin=Cin[n_conv+i], Cout=Cout[n_conv+i], Precision=act_in, D_BW_W=D_BW_W[i], D_SHIFT=D_SHIFT[i], bn_en=(i != (n_fc-1)), BW_A=BN_BW_A[n_conv+i], BW_B=BN_BW_B[n_conv+i], R_SHIFT=BN_R_SHIFT[n_conv+i])
 
 	return R
+
+def test():
+	R_max = set_R_max()
+	R = windower_flex(WINDOW=3, 
+						NO_CH=128, 
+						LOG2_IMG_SIZE=10, 
+						THROUGHPUT=1, 
+						PADDDING=True)
+	logger(R, R_max)
+	R = windower_flex(WINDOW=3, 
+						NO_CH=128, 
+						LOG2_IMG_SIZE=10, 
+						THROUGHPUT=2, 
+						PADDDING=True)
+	logger(R, R_max)
+	R = windower_flex(WINDOW=3, 
+						NO_CH=128, 
+						LOG2_IMG_SIZE=10, 
+						THROUGHPUT=2, 
+						PADDDING=True)
+	logger(R, R_max)
+	R = windower_flex(WINDOW=3, 
+						NO_CH=128, 
+						LOG2_IMG_SIZE=10, 
+						THROUGHPUT=2, 
+						PADDDING=True)
+	logger(R, R_max)
+	return 

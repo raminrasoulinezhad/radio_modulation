@@ -6,7 +6,7 @@
 // important notes:
 //		it can not tolerate new input during autorun state. 
 
-module windower_ramin
+module windower_flex
 #(
 	parameter NO_CH = 2,
 	parameter LOG2_IMG_SIZE = 10,

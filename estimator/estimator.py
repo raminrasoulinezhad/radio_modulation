@@ -1,4 +1,3 @@
-import os
 import argparse
 import numpy as np
 
@@ -14,10 +13,11 @@ def get_args():
 if __name__ == "__main__":
 	args = get_args()
 	
-	R = reset_R()
 	R_max = set_R_max() 
 
 	# to estimate the f64 model
-	R += tw_vgg_2iq()
+	R = tw_vgg_2iq()
+
+	#test()
 
 	logger(R, R_max)

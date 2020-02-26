@@ -1,5 +1,5 @@
 `timescale 1ns/1ps
-module windower_ramin_tb();
+module windower_flex_tb();
 
 	parameter NO_CH = 16;
 	parameter LOG2_IMG_SIZE = 6;
@@ -10,6 +10,9 @@ module windower_ramin_tb();
 	parameter clk_p = 1.0;
 	parameter clk_p2= clk_p/2;
 
+	parameter stall_time = 1044;
+	parameter stall_repeats = 2;
+
 	reg clk;
 	reg rst;
 
@@ -18,6 +21,8 @@ module windower_ramin_tb();
 
 	wire vld_out;
 	wire [NO_CH-1:0] data_out [WINDOW-1:0];
+	wire vld_out_flex;
+	wire [NO_CH-1:0] data_out_flex [WINDOW-1:0];
 	
 	integer i;
 	reg [NO_CH-1:0] count;
@@ -40,13 +45,21 @@ module windower_ramin_tb();
 		repeat (2)  @(posedge clk) 
 		rst = 0;
 
-		repeat (2**LOG2_IMG_SIZE) begin 
+		repeat (stall_repeats + 2**LOG2_IMG_SIZE) begin 
 			@(posedge clk) begin
-				for (i = 0; i < THROUGHPUT; i = i + 1)begin
-					data_in[i] = count;
-					count = count + 1;
+				if ((count < stall_time) || (count >= stall_time+stall_repeats)) begin
+					for (i = 0; i < THROUGHPUT; i = i + 1)begin
+						data_in[i] = count;
+						count = count + 1;
+					end
+					#clk_p2 vld_in = 1;
+				end else begin
+					for (i = 0; i < THROUGHPUT; i = i + 1)begin
+						data_in[i] = 'x;
+						count = count + 1;
+					end
+					#clk_p2 vld_in = 0;
 				end
-				#clk_p2 vld_in = 1;
 			end
 		end
 
@@ -60,12 +73,27 @@ module windower_ramin_tb();
 
 	end
 
-	windower_ramin #(
+	windower_flex #(
 		NO_CH,
 		LOG2_IMG_SIZE,
 		THROUGHPUT,
 		WINDOW,
 		PADDDING
+	) windower_flex_inst (
+		.clk(clk),
+		.rst(rst),
+
+		.vld_in(vld_in),
+		.data_in(data_in),
+
+		.vld_out(vld_out_flex),
+		.data_out(data_out_flex)
+	);
+
+	windower #(
+		NO_CH,
+		LOG2_IMG_SIZE,
+		THROUGHPUT
 	) windower_inst (
 		.clk(clk),
 		.rst(rst),
@@ -76,6 +104,5 @@ module windower_ramin_tb();
 		.vld_out(vld_out),
 		.data_out(data_out)
 	);
-
 
 endmodule 

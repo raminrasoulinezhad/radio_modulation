@@ -21,6 +21,7 @@ The directory [train_tnn](train_tnn) contains all scripts to train the models in
 [c_generation](c_generation) has scripts to load the the csv weights and generate c code using the twn_generator package.
 [c](c) has code to implement quantized cnn components to mimic the precision of the verilog.
 It also has files to create a python module for a given model.
+[interface_verilog](interface_verilog) It includes the verilog files of a data streamer and required scheduler to connect the Input generator, TWN, and HOST including testbench. The data streamer can generate different modulation signals. 
 
 ## Running
 
@@ -88,9 +89,13 @@ To test the quantized performance on all models run
 
 ## cheatsheet:
 
-install:
+install (on a GPU system):
 	
 	pip3 install tensorflow-gpu==1.14 tqdm twn_generator scipy scikit-image
+
+install (on a CPU system):
+
+	pip3 install tensorflow==1.14 tqdm twn_generator scipy scikit-image
 
 tensorboard:
 
@@ -143,3 +148,16 @@ Classes
 Sed (Sid :) 
 
 	cat ./*  | grep "CLB LUTs" | sed -e "s/[^0-9.]/ /g" -e "s/  */ /g" | sed "s/ *//" | sed "s/ /\n/" | sed -n 1~2p
+
+# verification
+
+windower 
+windower_ramin:
+	ModelSim --> OK
+	Estimation --> OK
+	windower_ramin is superset of windower
+
+| Module        | Modelsim | estimation | 
+| ------------- | -------- | ---------- | 
+| windower      | OK       | None       | 
+| windower_flex | OK       | OK         |  
