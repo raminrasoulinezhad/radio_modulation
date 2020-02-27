@@ -588,8 +588,18 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 
 
 
+def test_to_serial():
 
-
+	R_max = set_R_max()
+	R = to_serial(NO_CH=32, BW_IN=12, BW_OUT=2)
+	logger(R, R_max)
+	R = to_serial(NO_CH=128, BW_IN=12, BW_OUT=3)
+	logger(R, R_max)
+	R = to_serial(NO_CH=8, BW_IN=12, BW_OUT=4)
+	logger(R, R_max)
+	R = to_serial(NO_CH=32, BW_IN=12, BW_OUT=6)
+	logger(R, R_max)
+	return 
 
 
 def test_windower_serial_flex():

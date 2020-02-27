@@ -163,7 +163,7 @@ windower_ramin:
 | windower_flex        | **OK**   | **OK**     |
 | windower_serial      | **OK**   | **None**   |
 | windower_serial_flex | **OK**   | **OK**     |
-|  |    |      |
+| to_serial            | **OK**   | **OK**     |
 |  |    |      |
 
 
