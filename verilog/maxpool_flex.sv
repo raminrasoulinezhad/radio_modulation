@@ -4,10 +4,10 @@
  It can take a serial input with least significant word first as input
  */
 
-module maxpool_ramin
+module maxpool_flex
 #(
 	parameter NO_CH = 10,
-	// "BW_IN" sjould be dividable by "SER_BW"
+	// "BW_IN" should be dividable by "SER_BW"
 	parameter BW_IN = 12,
 	parameter SER_BW = 4
 ) (
@@ -21,7 +21,8 @@ module maxpool_ramin
 	output [NO_CH-1:0][BW_IN-1:0] data_out
 );
 	// compute how many cycles needed for a compare
-	localparam BUF_CYC = 2 * (BW_IN / SER_BW);			
+	localparam BUF_CYC = 2 * (BW_IN / SER_BW);	
+			
 	localparam DATA_SIZE = BW_IN;							
 	localparam BUF_SIZE = 2 * BW_IN;					
 	localparam CNTR_SIZE = $clog2( BUF_CYC );				

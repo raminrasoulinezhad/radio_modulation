@@ -18,7 +18,8 @@ module maxpool
 	output [NO_CH-1:0][BW_IN-1:0] data_out
 );
 	// compute how many cycles needed for a compare
-	localparam integer BUF_CYC = 1 << (1 + $clog2(BW_IN) - $clog2(SER_BW) ); 	
+	//localparam integer BUF_CYC = 1 << (1 + $clog2(BW_IN) - $clog2(SER_BW) ); 	
+	localparam integer BUF_CYC = 1 << (1 + $clog2(BW_IN / SER_BW));
 	localparam integer DATA_SIZE = (BUF_CYC*SER_BW) >> 1;						
 	localparam integer BUF_SIZE = BUF_CYC*SER_BW;								
 	localparam integer CNTR_SIZE = $clog2( BUF_CYC );							
