@@ -157,7 +157,22 @@ windower_ramin:
 	Estimation --> OK
 	windower_ramin is superset of windower
 
-| Module        | Modelsim | estimation | 
-| ------------- | -------- | ---------- | 
-| windower      | OK       | None       | 
-| windower_flex | OK       | OK         |  
+| Module               | Modelsim | estimation |
+| :---                 | :---     | :---       |
+| windower             | **OK**   | **None**   |
+| windower_flex        | **OK**   | **OK**     |
+| windower_serial      | **OK**   | **None**   |
+| windower_serial_flex | **OK**   | **OK**     |
+|  |    |      |
+|  |    |      |
+
+
+# f64 is not working 
+
+ASSERTION FAILED: data_out = 028bff95fa9401e902bd06410ac7096eff9d0130f42df6aa000904d6fff205d0004f018bf779ffc0febe07440aecf7e6, expected_out = 01bb01fc021cfe18ff0aff0efd93fa4ef9bafb47f8b0ff9afcdff99ffd62feb5fe94fe90018c018b07d0025903b3095c
+
+ASSERTION FAILED: data_out = 042d019ffcae038c033907cf0c1005bffef40043f6cef4c2fcba02ef046807d400e600a6f9fa0006ff670a930af7faaa, expected_out = 01bb01fc021cfe18ff0aff0efd93fa4ef9bafb47f8b0ff9afcdff99ffd62feb5fe94fe90018c018b07d0025903b3095c
+
+** Note: $finish    : /home/ramin/test/f64/sim/tw_vgg_2iq_test.sv(61)
+Time: 6960 ns  Iteration: 1  Instance: /tw_vgg_2iq_test
+

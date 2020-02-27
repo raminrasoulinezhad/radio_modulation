@@ -3,7 +3,7 @@
  It assumes that after a vld_in signal, the entire image will be sent for 2^(LOG2_IMG_SIZE) cycles
  This windower is used to produce multiple convolutional windows depending on the THROUGHPUT
  */
-module windower_serial_ramin
+module windower_serial_flex
 #(
 	parameter NO_CH = 2,
 	parameter LOG2_IMG_SIZE = 10,
@@ -17,7 +17,7 @@ module windower_serial_ramin
 	input [NO_CH-1:0] data_in,
 	
 	output logic vld_out,
-	output [NO_CH-1:0] data_out [WINDOW_SIZE-1:0],
+	output reg [NO_CH-1:0] data_out [WINDOW_SIZE-1:0],
 	
 	output ser_rst
 );
@@ -28,6 +28,7 @@ module windower_serial_ramin
 
 	localparam PAD = SER_CYC * ((WINDOW_SIZE-1)/2);
 
+	reg [1:0] state;
 	localparam state_wait = 2'b00;
 	localparam state_run = 2'b01;
 	localparam state_autorun = 2'b10;
@@ -38,12 +39,54 @@ module windower_serial_ramin
 	reg [LOG2_IMG_SIZE+LOG2_SER-1:0] cntr;
 	
 	reg [LOG2_SER+LOG2_W_S-1:0] remaining;
-		
-	assign ser_rst = (cntr[LOG2_SER-1:0] == 0);
 
-	reg [1:0] state;
+
+	//assign ser_rst = (cntr[LOG2_SER-1:0] == 0);
+	assign ser_rst = (cntr[LOG2_SER-1:0] == (SER_CYC-1));
+	//assign ser_rst = (((SER_CYC-1) == cntr) && ((vld_in)||(state == state_autorun)));
+
+	wire cond0;
+	//wire cond1;
+
+	assign cond0 = (state == state_autorun) && (remaining != 0);
+	//assign cond1 = vld_in && ((state == state_wait)|| (state == state_run));
 
 	integer i, j;
+	always @( posedge clk ) begin
+		if (rst) begin
+			window_mem_a <= 0;
+			for (i = 0; i < WINDOW_SIZE - 1; i = i + 1) begin
+				for (j = 0; j < SER_CYC; j = j + 1) begin
+					window_mem[i][j] <= 0;
+				end
+			end
+		end else begin
+			if (cond0) begin 
+				window_mem_a <= 0;
+				for (i = 0; i < WINDOW_SIZE - 1; i = i + 1) begin
+					if (i == 0) begin
+						window_mem[i][0] <= window_mem_a;
+					end else begin 
+						window_mem[i][0] <= window_mem[i-1][SER_CYC-1];
+					end
+					window_mem[i][SER_CYC-1:1] <= window_mem[i][SER_CYC-2:0];
+				end
+			end else if (vld_in) begin
+				window_mem_a <= data_in;
+				for (i = 0; i < WINDOW_SIZE - 1; i = i + 1) begin
+					if (i == 0) begin
+						window_mem[i][0] <= window_mem_a;
+					end else begin 
+						window_mem[i][0] <= window_mem[i-1][SER_CYC-1];
+					end
+					window_mem[i][SER_CYC-1:1] <= window_mem[i][SER_CYC-2:0];
+				end
+			end 
+
+		end
+	end
+
+	/*integer i, j;
 	always @( posedge clk ) begin
 		if (rst) begin
 			window_mem_a <= 0;
@@ -85,7 +128,7 @@ module windower_serial_ramin
 				end
 			end
 		end
-	end
+	end*/
 
 	// output manager
 	integer k;
@@ -114,9 +157,8 @@ module windower_serial_ramin
 					if (cntr == (CNTR_MAX-PAD-2)) begin
 						state <= state_autorun;
 						remaining = PAD;
-					end else begin 
-						cntr <= cntr + 1;
 					end 
+					cntr <= cntr + 1;
 				end else begin
 					vld_out <= 0;
 				end
@@ -124,6 +166,7 @@ module windower_serial_ramin
 				if (remaining != 0) begin
 					remaining <= remaining - 1;
 					vld_out <= 1;
+					cntr <= cntr + 1;
 				end else begin  
 					vld_out <= 0;
 					state <= state_wait;

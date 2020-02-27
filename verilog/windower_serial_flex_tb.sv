@@ -1,6 +1,6 @@
 `timescale 1ns/1ps
 
-module windower_serial_ramin_tb();
+module windower_serial_flex_tb();
 
 	parameter PARALLEL_WIDTH = 16;
 	parameter SERIAL_WIDTH = 4;
@@ -25,6 +25,9 @@ module windower_serial_ramin_tb();
 	wire [NO_CH_IN-1:0] data_out [WINDOW_SIZE-1:0];
 	wire ser_rst;
 
+	wire vld_out_flex;
+	wire [NO_CH_IN-1:0] data_out_flex [WINDOW_SIZE-1:0];
+	wire ser_rst_flex;
 
 	initial begin 
 		clk = 0;
@@ -63,6 +66,7 @@ module windower_serial_ramin_tb();
 			#clk_p2 vld_in = 0;
 		end 
 
+		count = 0;
 
 		repeat (2**(LOG2_IMG_SIZE+LOG2_SER)) begin 
 			@(posedge clk) begin
@@ -83,12 +87,31 @@ module windower_serial_ramin_tb();
 
 	end
 
-	windower_serial_ramin #(
+	windower_serial_flex #(
 		NO_CH_IN,
 		LOG2_IMG_SIZE,
 		WINDOW_SIZE,
 		SER_CYC
-	) dut (
+	) inst_flex (
+		.clk(clk),
+		.rst(rst),
+
+		.vld_in(vld_in),
+		.data_in(data_in),
+
+		.vld_out(vld_out_flex),
+		.data_out(data_out_flex),
+	
+		.ser_rst(ser_rst_flex)
+	);
+
+
+	windower_serial #(
+		NO_CH_IN,
+		LOG2_IMG_SIZE,
+		WINDOW_SIZE,
+		SER_CYC
+	) inst (
 		.clk(clk),
 		.rst(rst),
 
@@ -100,5 +123,7 @@ module windower_serial_ramin_tb();
 	
 		.ser_rst(ser_rst)
 	);
+
+
 
 endmodule 

@@ -5,18 +5,18 @@
  */
 module windower_serial
 #(
-  parameter NO_CH = 2,
-  parameter LOG2_IMG_SIZE = 10,
-  parameter WINDOW_SIZE = 3, // only works for 3 currently
-  parameter SER_CYC = 1 // must be a power of 2
+	parameter NO_CH = 2,
+	parameter LOG2_IMG_SIZE = 10,
+	parameter WINDOW_SIZE = 3, 	// only works for 3 currently
+	parameter SER_CYC = 1 		// must be a power of 2
 ) (
-   input 		    clk,
-   input 		    rst,
-   input 		    vld_in,
-   input [NO_CH-1:0] 	    data_in,
-   output logic 	    vld_out,
-   output logic [NO_CH-1:0] data_out [WINDOW_SIZE-1:0],
-   output 		    ser_rst
+	input clk,
+	input rst,
+	input vld_in,
+	input [NO_CH-1:0] data_in,
+	output logic vld_out,
+	output logic [NO_CH-1:0] data_out [WINDOW_SIZE-1:0],
+	output ser_rst
 );
 
 	localparam LOG2_SER = $clog2( SER_CYC );

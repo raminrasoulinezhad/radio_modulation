@@ -77,13 +77,20 @@ def windower_serial_flex(NO_CH=2, LOG2_IMG_SIZE=10, WINDOW=3, SER_CYC=1):
 	CNTR_MAX = 2**(LOG2_IMG_SIZE+LOG2_SER);
 	PAD = SER_CYC * ((WINDOW-1)/2)
 
-	LUT = NO_CH								# window_mem_a multiplexers
+	LUT = int(NO_CH	/ 2)					# window_mem_a multiplexers
+	LUT += int(NO_CH * (WINDOW-1) / 2)		# 2to1 mux acccording to the synthesis (probably for syncronous reset), each one is LUT2 (0.5 LE) 
+
 	LUT += LOG2_SER + LOG2_W_S				# remaining subtracter
-	LUT += (LOG2_IMG_SIZE + LOG2_SER) + 4	# cntr comparator and adder 
+	LUT += (LOG2_IMG_SIZE + LOG2_SER) + LOG2_SER	# cntr comparator and adder 
 	LUT += 1								# ser_rst (can not be more than a LUT normally)
 
 	FF = NO_CH								# window_mem_a
-	FF += (WINDOW-1) * SER_CYC * NO_CH		# window_mem
+	
+	#FF += (WINDOW-1) * SER_CYC * NO_CH		# window_mem (register)
+	LUT += (WINDOW-1) * int(np.ceil(SER_CYC/16)) * NO_CH		# window_mem (shiftregister)
+	# to register the outputs 
+	FF += (WINDOW-1) * NO_CH * 2			# According to the synthesis results, the last two outputs are registered
+
 	FF += LOG2_IMG_SIZE + LOG2_SER			# cntr
 	FF += LOG2_SER + LOG2_W_S				# remaining
 	FF += 2 								# state
@@ -579,7 +586,37 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 
 	return R
 
-def test():
+
+
+
+
+
+
+def test_windower_serial_flex():
+	R_max = set_R_max()
+	R = windower_serial_flex(NO_CH=32, 
+						LOG2_IMG_SIZE=12, 
+						WINDOW=3, 
+						SER_CYC=16)
+	logger(R, R_max)
+	R = windower_serial_flex(NO_CH=8, 
+						LOG2_IMG_SIZE=10, 
+						WINDOW=5, 
+						SER_CYC=8)
+	logger(R, R_max)
+	R = windower_serial_flex(NO_CH=64, 
+						LOG2_IMG_SIZE=8, 
+						WINDOW=7, 
+						SER_CYC=6)
+	logger(R, R_max)
+	R = windower_serial_flex(NO_CH=128, 
+						LOG2_IMG_SIZE=6, 
+						WINDOW=9, 
+						SER_CYC=4)
+	logger(R, R_max)
+	return 
+
+def test_windower_flex():
 	R_max = set_R_max()
 	R = windower_flex(WINDOW=3, 
 						NO_CH=128, 
