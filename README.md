@@ -164,6 +164,8 @@ windower_ramin:
 | windower_serial      | **OK**   | **None**   |
 | windower_serial_flex | **OK**   | **OK**     |
 | to_serial            | **OK**   | **OK**     |
+| maxpool              | **OK**   | **None**   |
+| maxpool_flex         | **OK**   | **OK**     |
 |  |    |      |
 
 
