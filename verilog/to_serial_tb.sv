@@ -10,7 +10,6 @@ module to_serial_tb();
 	parameter clk_p = 1.0;
 	parameter clk_p2= clk_p/2;
 
-	//parameter stall_time = 1044;
 	parameter exp_repeats = 2;
 
 	reg clk;
@@ -50,31 +49,6 @@ module to_serial_tb();
 			vld_in = 0;		
 		end 	
 
-
-//		repeat (exp_repeats) begin 
-//			@(posedge clk) begin
-//				if ((count < stall_time) || (count >= stall_time+stall_repeats)) begin
-//					for (i = 0; i < THROUGHPUT; i = i + 1)begin
-//						data_in[i] = count;
-//						count = count + 1;
-//					end
-//					#clk_p2 vld_in = 1;
-//				end else begin
-//					for (i = 0; i < THROUGHPUT; i = i + 1)begin
-//						data_in[i] = 'x;
-//						count = count + 1;
-//					end
-//					#clk_p2 vld_in = 0;
-//				end
-//			end
-//		end
-//
-//		@(posedge clk) #clk_p2 vld_in = 0;
-//
-//		repeat (10)  begin
-//			@(posedge clk)
-//			#clk_p2 vld_in = 0;
-//		end 
 		$stop;
 
 	end
@@ -93,14 +67,5 @@ module to_serial_tb();
 		.vld_out(vld_out),
 		.data_out(data_out)
 	);
-
-
-
-//		for (i = 0; i < ; i = i + 1) begin
-//			for (j = 0; j < ; j = j + 1) begin 
-//				data_in[i][j] = count;
-//				count = count + 1;
-//			end
-//		end 
 
 endmodule 

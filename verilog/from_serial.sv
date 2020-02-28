@@ -3,8 +3,8 @@
 module from_serial
 #(
 	parameter NO_CH = 10,
-	parameter BW_IN = 2,	//it was 8
-	parameter BW_OUT = 8	//it was 2
+	parameter BW_IN = 2,
+	parameter BW_OUT = 8
 )(
 	input clk,
 	input rst,
@@ -14,7 +14,9 @@ module from_serial
 	output vld_out,
 	output [NO_CH-1:0][BW_OUT-1:0] data_out
 );
-	localparam NO_CYC = int'($ceil(BW_OUT/BW_IN));	// it works in Vivado 2018.3
+	//localparam NO_CYC = int'($ceil(BW_OUT/BW_IN));	// it works in Vivado 2018.3
+	localparam NO_CYC = BW_OUT/BW_IN;	// it works in Vivado 2018.2
+	
 	localparam CNTR_BW = $clog2(NO_CYC);
 	
 	reg [NO_CH-1:0][BW_OUT-1:0] tmp_in;

@@ -589,6 +589,19 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 ######################################
 # Tests  #############################
 ######################################
+
+def test_from_serial():
+	R_max = set_R_max()
+	R = from_serial(NO_CH=64, BW_IN=4, BW_OUT=8)
+	logger(R, R_max)
+	R = from_serial(NO_CH=256, BW_IN=2, BW_OUT=8)
+	logger(R, R_max)
+	R = from_serial(NO_CH=512, BW_IN=4, BW_OUT=32)
+	logger(R, R_max)
+	R = from_serial(NO_CH=1024, BW_IN=2, BW_OUT=16)
+	logger(R, R_max)
+	return 
+
 def test_maxpool_flex():
 	R_max = set_R_max()
 	R = maxpool_flex(NO_CH=10, BW_IN=12, SER_BW=4)
@@ -616,25 +629,13 @@ def test_to_serial():
 
 def test_windower_serial_flex():
 	R_max = set_R_max()
-	R = windower_serial_flex(NO_CH=32, 
-						LOG2_IMG_SIZE=12, 
-						WINDOW=3, 
-						SER_CYC=16)
+	R = windower_serial_flex(NO_CH=32, LOG2_IMG_SIZE=12, WINDOW=3, SER_CYC=16)
 	logger(R, R_max)
-	R = windower_serial_flex(NO_CH=8, 
-						LOG2_IMG_SIZE=10, 
-						WINDOW=5, 
-						SER_CYC=8)
+	R = windower_serial_flex(NO_CH=8, LOG2_IMG_SIZE=10, WINDOW=5, SER_CYC=8)
 	logger(R, R_max)
-	R = windower_serial_flex(NO_CH=64, 
-						LOG2_IMG_SIZE=8, 
-						WINDOW=7, 
-						SER_CYC=6)
+	R = windower_serial_flex(NO_CH=64, LOG2_IMG_SIZE=8, WINDOW=7, SER_CYC=6)
 	logger(R, R_max)
-	R = windower_serial_flex(NO_CH=128, 
-						LOG2_IMG_SIZE=6, 
-						WINDOW=9, 
-						SER_CYC=4)
+	R = windower_serial_flex(NO_CH=128, LOG2_IMG_SIZE=6, WINDOW=9, SER_CYC=4)
 	logger(R, R_max)
 	return 
 

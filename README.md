@@ -166,7 +166,8 @@ windower_ramin:
 | to_serial            | **OK**   | **OK**     |
 | maxpool              | **OK**   | **None**   |
 | maxpool_flex         | **OK**   | **OK**     |
-|  |    |      |
+| from_serial          | **OK**   | **OK**     |
+
 
 
 # f64 is not working 
