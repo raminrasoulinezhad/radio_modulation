@@ -108,7 +108,7 @@ def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=-1):
 
 	# it is not fixed cost as the comparison is not using fix value
 	# MAXVAL affects the cost
-	LUT_i = ((BW_OUT+1) if (MAXVAL!=-1) else 0) 
+	LUT_i = (BW_OUT if (MAXVAL!=-1) else 0) 
 	LUT = LUT_i * NO_CH
 
 	FF_i = 1 * BW_OUT 					#relu_i 			
