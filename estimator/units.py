@@ -106,9 +106,10 @@ def bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=-1):
 
 	BITS_MAX = R_SHIFT if ( R_SHIFT > BW_A ) else BW_A;
 
-	LUT = 0 
-	# will be captured by DSP 
-	# LUT += BW_OUT * NO_CH
+	# it is not fixed cost as the comparison is not using fix value
+	# MAXVAL affects the cost
+	LUT_i = ((BW_OUT+1) if (MAXVAL!=-1) else 0) 
+	LUT = LUT_i * NO_CH
 
 	FF_i = 1 * BW_OUT 					#relu_i 			
 	# will capture by DSP registers: 	mult_i(BW_IN+BITS_MAX), bias_i(BW_IN+BITS_MAX), shift_i(BW_OUT)
@@ -589,6 +590,17 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 ######################################
 # Tests  #############################
 ######################################
+def test_bn():
+	R_max = set_R_max()
+	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=4095)
+	logger(R, R_max)
+	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=60)
+	logger(R, R_max)
+	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=64)
+	logger(R, R_max)
+	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=32)
+	logger(R, R_max)
+	return 
 
 def test_from_serial():
 	R_max = set_R_max()
@@ -615,7 +627,6 @@ def test_maxpool_flex():
 	return 
 
 def test_to_serial():
-
 	R_max = set_R_max()
 	R = to_serial(NO_CH=32, BW_IN=12, BW_OUT=2)
 	logger(R, R_max)
@@ -641,28 +652,12 @@ def test_windower_serial_flex():
 
 def test_windower_flex():
 	R_max = set_R_max()
-	R = windower_flex(WINDOW=3, 
-						NO_CH=128, 
-						LOG2_IMG_SIZE=10, 
-						THROUGHPUT=1, 
-						PADDDING=True)
+	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=True)
 	logger(R, R_max)
-	R = windower_flex(WINDOW=3, 
-						NO_CH=128, 
-						LOG2_IMG_SIZE=10, 
-						THROUGHPUT=2, 
-						PADDDING=True)
+	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=2, PADDDING=True)
 	logger(R, R_max)
-	R = windower_flex(WINDOW=3, 
-						NO_CH=128, 
-						LOG2_IMG_SIZE=10, 
-						THROUGHPUT=2, 
-						PADDDING=True)
+	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=2, PADDDING=True)
 	logger(R, R_max)
-	R = windower_flex(WINDOW=3, 
-						NO_CH=128, 
-						LOG2_IMG_SIZE=10, 
-						THROUGHPUT=2, 
-						PADDDING=True)
+	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=2, PADDDING=True)
 	logger(R, R_max)
 	return 
