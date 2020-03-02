@@ -219,14 +219,14 @@ def popcount_accumulate (NO_CH=64, BW_IN=12, BW_OUT=16, CYC_ACC=4, RSHIFT_CYC=1)
 
 def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
-	#INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
-	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else OUT_BITWIDTH
+	INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else IN_BITWIDTH
+	#INCR_BW = (IN_BITWIDTH + 1) if (IN_BITWIDTH < OUT_BITWIDTH) else OUT_BITWIDTH
 	
 	NO_IN = 2 ** LOG2_NO_IN
 
 	if LOG2_NO_IN == 0:
 
-		LUT = 2*OUT_BITWIDTH		# adder & mux
+		LUT = OUT_BITWIDTH		# adder & mux
 		FF = OUT_BITWIDTH		# data_out_reg
 
 		BRAM = 0
@@ -236,10 +236,10 @@ def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
 	else:
 
-		LUT = int(NO_IN / 2) * INCR_BW 	# signed adder
+		LUT = int(NO_IN / 2) * IN_BITWIDTH 	# signed adder
 
-		FF = int(NO_IN / 2) * INCR_BW		# intermediate_results
-		FF += 1							# new_sum_reg
+		FF = int(NO_IN / 2) * INCR_BW	# intermediate_results
+		FF += 1								# new_sum_reg
 
 		BRAM = 0
 		DSP = 0
@@ -277,7 +277,9 @@ def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2,
 
 	BRAM = 0
 
-	return np.array([LUT, FF, BRAM, DSP]) + pipelined_accumulator(IN_BITWIDTH=PACC_IN_BW, OUT_BITWIDTH=PACC_OUT_BW, LOG2_NO_IN=LOG2_NO_VECS)
+	return np.array([LUT, FF, BRAM, DSP]) + pipelined_accumulator(IN_BITWIDTH=PACC_IN_BW, 
+																OUT_BITWIDTH=PACC_OUT_BW, 
+																LOG2_NO_IN=LOG2_NO_VECS)
 
 def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16, 
 	R_SHIFT=0, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=128):
@@ -608,6 +610,36 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 ######################################
 # Tests  #############################
 ######################################
+def test_multiply_accumulate_fp():
+	R_max = set_R_max()
+	# Check: R_SHIFT+BW_OUT < PACC_OUT_BW
+	# for full-precision: "R_SHIFT = BW_W + BW_IN + $clog2(NUM_CYC) + LOG2_NO_VECS - BW_OUT"
+	R = multiply_accumulate_fp (LOG2_NO_VECS=1, BW_IN=16, BW_OUT=16, BW_W=2, 
+		R_SHIFT=8, USE_UNSIGNED_DATA=8, NUM_CYC=32, full_precision=False)
+	logger(R, R_max)
+	R = multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2, 
+		R_SHIFT=9, USE_UNSIGNED_DATA=9, NUM_CYC=32, full_precision=False)
+	logger(R, R_max)
+	R = multiply_accumulate_fp (LOG2_NO_VECS=3, BW_IN=16, BW_OUT=16, BW_W=2, 
+		R_SHIFT=10, USE_UNSIGNED_DATA=10, NUM_CYC=32, full_precision=False)
+	logger(R, R_max)
+	R = multiply_accumulate_fp (LOG2_NO_VECS=4, BW_IN=16, BW_OUT=16, BW_W=2, 
+		R_SHIFT=11, USE_UNSIGNED_DATA=11, NUM_CYC=32, full_precision=False)
+	logger(R, R_max)
+	return 
+
+def test_pipelined_accumulator():
+	R_max = set_R_max()
+	R = pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=8, LOG2_NO_IN=1)
+	logger(R, R_max)
+	R = pipelined_accumulator (IN_BITWIDTH=6, OUT_BITWIDTH=9, LOG2_NO_IN=3)
+	logger(R, R_max)
+	R = pipelined_accumulator (IN_BITWIDTH=12, OUT_BITWIDTH=12, LOG2_NO_IN=2)
+	logger(R, R_max)
+	R = pipelined_accumulator (IN_BITWIDTH=10, OUT_BITWIDTH=11, LOG2_NO_IN=4)
+	logger(R, R_max)
+	return 
+
 def test_popcount_accumulate():
 	R_max = set_R_max()
 	R = popcount_accumulate (NO_CH=512, BW_IN=8, BW_OUT=16, CYC_ACC=4, RSHIFT_CYC=1)
