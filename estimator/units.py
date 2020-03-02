@@ -196,8 +196,26 @@ def serial_adder(BW=16):
 	return np.array([LUT, FF, BRAM, DSP])
 
 
-def popcount_accumulate ():
-	raise Exception ("it is not implemented")
+def popcount_accumulate (NO_CH=64, BW_IN=12, BW_OUT=16, CYC_ACC=4, RSHIFT_CYC=1):
+	print("popcount_accumulate is not accurate (+/- Ch_IN error in LUTs)")	
+	L2_CYC = int(np.ceil(np.log2(CYC_ACC)))
+	LSHIFT = ( CYC_ACC - 1 ) * RSHIFT_CYC
+	RSHIFT = RSHIFT_CYC
+
+	#LUT_i = BW_OUT + int(np.ceil(LSHIFT/2)) #+ LSHIFT				# adder the first LSHIFT bits of din is zero
+	LUT_i = BW_OUT + LSHIFT/2 
+	LUT = int(LUT_i * NO_CH)
+	LUT += (2 * L2_CYC) 					# cyc_cntr and comparator
+
+	FF = (BW_OUT+LSHIFT) * NO_CH
+	FF += L2_CYC
+	FF += 1
+
+	BRAM = 0
+	DSP = 0
+	
+	return np.array([LUT, FF, BRAM, DSP])
+
 
 def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 
@@ -590,6 +608,18 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 ######################################
 # Tests  #############################
 ######################################
+def test_popcount_accumulate():
+	R_max = set_R_max()
+	R = popcount_accumulate (NO_CH=512, BW_IN=8, BW_OUT=16, CYC_ACC=4, RSHIFT_CYC=1)
+	logger(R, R_max)
+	R = popcount_accumulate (NO_CH=512, BW_IN=12, BW_OUT=16, CYC_ACC=4, RSHIFT_CYC=1)
+	logger(R, R_max)
+	R = popcount_accumulate (NO_CH=512, BW_IN=12, BW_OUT=8, CYC_ACC=4, RSHIFT_CYC=1)
+	logger(R, R_max)
+	R = popcount_accumulate (NO_CH=512, BW_IN=12, BW_OUT=16, CYC_ACC=8, RSHIFT_CYC=1)
+	logger(R, R_max)
+	return 
+
 def test_bn():
 	R_max = set_R_max()
 	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=4095)

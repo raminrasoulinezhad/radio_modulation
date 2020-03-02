@@ -156,24 +156,24 @@ windower_ramin:
 	ModelSim --> OK
 	Estimation --> OK
 	windower_ramin is superset of windower
-
-| Module                  | Modelsim | estimation |
-| :---                    | :---     | :---       |
-| windower                | **OK**   | **None**   |
-| windower_flex           | **OK**   | **OK**     |
-| windower_serial         | **OK**   | **None**   |
-| windower_serial_flex    | **OK**   | **OK**     |
-| to_serial               | **OK**   | **OK**     |
-| maxpool                 | **OK**   | **None**   |
-| maxpool_flex            | **OK**   | **OK**     |
-| from_serial             | **OK**   | **OK**     |
-| bn_relu_fp              | **OK**   | **OK**     |
-| bn_relu_fp_accurate     | **OK**   | **OK**     |
-| :---                    | :---     | :---       |
+   
+| Module                  | Modelsim | estimation    |
+| :---                    | :---     | :---          |
+| windower                | **OK**   | **None**      |
+| windower_flex           | **OK**   | **OK**        |
+| windower_serial         | **OK**   | **None**      |
+| windower_serial_flex    | **OK**   | **OK**        |
+| to_serial               | **OK**   | **OK**        |
+| maxpool                 | **OK**   | **None**      |
+| maxpool_flex            | **OK**   | **OK**        |
+| from_serial             | **OK**   | **OK**        |
+| bn_relu_fp              | **OK**   | **OK**        |
+| bn_relu_fp_accurate     | **OK**   | **OK**        |
+| :---                    | :---     | :---          |
 | dense_layer_fp          | ****   | ****     |
 | multiply_accumulate_fp  | ****   | ****     |
 | pipelined_accumulator   | ****   | ****     |
-| popcount_accumulate     | ****   | ****     |
+| popcount_accumulate     | ****   | **Semi-OK**     |
 
 
 

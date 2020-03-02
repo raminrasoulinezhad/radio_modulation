@@ -56,7 +56,6 @@ module popcount_accumulate
 			assign csin[BW_OUT+LSHIFT-RSHIFT-1:0] = curr_sums[i][BW_OUT+LSHIFT-1:RSHIFT];
 			assign csin[BW_OUT+LSHIFT-1:BW_OUT+LSHIFT-RSHIFT] = {RSHIFT{curr_sums[i][BW_OUT+LSHIFT-1]}};
 			assign newsum = start ? din : (din + csin);
-			assign data_out[i] = curr_sums[i][BW_OUT-1:0];
 
 			always @( posedge clk ) begin
 				if ( vld_in ) begin
@@ -66,6 +65,9 @@ module popcount_accumulate
 					curr_sums[i] <= newsum;
 				end
 			end
+			
+			assign data_out[i] = curr_sums[i][BW_OUT-1:0];
+
 		end
 	endgenerate
 
