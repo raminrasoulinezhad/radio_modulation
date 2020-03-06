@@ -12,8 +12,6 @@ def get_args():
 
 if __name__ == "__main__":
 	args = get_args()
-	
-	#test_dense_layer_fp()
 
 	# to estimate the f64 model
 	R_max = set_R_max() 
