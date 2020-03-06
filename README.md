@@ -170,8 +170,8 @@ windower_ramin:
 | bn_relu_fp              | **OK**   | **OK**        |                        |
 | bn_relu_fp_accurate     | **OK**   | **OK**        |                        |
 | :---                    | :---     | :---          |                        |
-| dense_layer_fp          | ****     | ****          |                        |
-| multiply_accumulate_fp  | ****     | **OK**        | in full precision mode |
+| dense_layer_fp          | ****     | **OK**        |                        |
+| multiply_accumulate_fp  | ****     | **OK**        | R_SHIFT in full precision mode |
 | pipelined_accumulator   | ****     | **OK**        |                        |
 | popcount_accumulate     | ****     | **Semi-OK**   |                        |
 

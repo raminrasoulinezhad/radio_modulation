@@ -4,20 +4,41 @@ import re
 
 from utils import *
 
-def multiplier_cost (a, b):
+def multiplier_cost (a, b, en=False):
 	LUT = 0
 	DSP = 0
 
 	if ((a==16)&(b==2)):
-		LUT += 17 			
+		if en:
+			LUT = 31
+		else:
+			LUT = 17
 	elif ((a==16)&(b==4)):
-		LUT += 57
+		if en:
+			LUT = 73
+		else:
+			LUT = 57
 	elif ((a==16)&(b > 8)):
-		DSP += 1
+		DSP = 1
 	else:	
 		raise Exception("BW_IN=%d & BW_W=%d are not supported" % (BW_IN,BW_W))
 
 	return np.array([LUT, 0, 0, DSP])
+
+def mem_cost(rows, cols):
+	#print("mem cost. rows: %d, cols: %d" % (rows, cols))
+	if rows == 512:
+		return np.array([9 * cols, 0, 0, 0])
+	elif rows == 256:
+		return np.array([int(5 * cols), 0, 0, 0])
+	elif rows == 128:
+		return np.array([int(2.5 * cols), 0, 0, 0])
+	elif rows == 64:
+		return np.array([1 * cols, 0, 0, 0])
+	elif rows <= 32:
+		return np.array([int(0.5 * cols), 0, 0, 0])
+	else:
+		raise Exception ("mem cost is not supporting rows: %d, cols: %d" % (rows, cols) )
 
 def width_divider(in_w, times):
 	for i in range(times):
@@ -248,7 +269,7 @@ def pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=10, LOG2_NO_IN=1):
 			OUT_BITWIDTH=OUT_BITWIDTH, LOG2_NO_IN=LOG2_NO_IN-1)
 
 def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2, 
-	R_SHIFT=0, USE_UNSIGNED_DATA=0, NUM_CYC=32, full_precision=True):
+	R_SHIFT=0, USE_UNSIGNED_DATA=0, NUM_CYC=32, full_precision=True, en=False):
 
 	# This number is designed for full precision
 	# The reported number is the maximum resource usage
@@ -267,7 +288,7 @@ def multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2,
 		PACC_OUT_BW = R_SHIFT + BW_OUT
 
 	# multipliers
-	temp = multiplier_cost (BW_IN, BW_W)
+	temp = multiplier_cost (BW_IN, BW_W, en=en)
 
 	LUT = NO_VECS * temp[0]
 	DSP = NO_VECS * temp[3]
@@ -288,28 +309,23 @@ def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16,
 	VLD_SR_LEN = LOG2_NO_VECS + 3
 	LOG2_CYC = int(np.ceil(np.log2(NUM_CYC)))
 
-	LUT = int((OUTPUT_SIZE * INPUT_SIZE * BW_W)/2)	# w_or_zero
-	LUT += (3 * LOG2_CYC) 		# comparator and counter 
+	LUT = LOG2_CYC + int(np.ceil(np.log2(LOG2_CYC))) # comparator and counter 
 
 	FF = OUTPUT_SIZE * BW_OUT  	# res_out
 	FF += LOG2_CYC				# cntr
 	FF += VLD_SR_LEN			# vld_sr
 
-	BRAM = OUTPUT_SIZE/2
+	BRAM = 0 # OUTPUT_SIZE/2
 	DSP = 0
 
 	temp = OUTPUT_SIZE * multiply_accumulate_fp(LOG2_NO_VECS=LOG2_NO_VECS, 
 		BW_IN=BW_IN, BW_OUT=BW_OUT, BW_W=BW_W, R_SHIFT=R_SHIFT, 
 		NUM_CYC=NUM_CYC, USE_UNSIGNED_DATA=USE_UNSIGNED_DATA, 
-		full_precision=False)
-	#print("LOG2_NO_VECS: %d, BW_IN: %d, BW_OUT: %d, BW_W: %d, R_SHIFT: %d, NUM_CYC: %d, USE_UNSIGNED_DATA: %d" % (LOG2_NO_VECS,BW_IN,BW_OUT,BW_W,R_SHIFT,NUM_CYC,USE_UNSIGNED_DATA))
-
+		full_precision=False, en=True)
 	# new_sum register optimizations
 	temp -= [0, (OUTPUT_SIZE-1)*(LOG2_NO_VECS+1), 0, 0]
-	#temp += [OUTPUT_SIZE*3, 0, 0, 0]
 
-	return np.array([LUT, FF, BRAM, DSP]) + temp
-
+	return np.array([LUT, FF, BRAM, DSP]) + temp 
 
 
 def conv(K=3, Cin=64, Cout=64, act_in=16, Deep=1, file_addr=None):
@@ -568,7 +584,12 @@ def FCLayer(Cin=64, Cout=128, Precision=16, D_IN_SIZE=1, D_CYC=512, D_BW_W=2, D_
 	# flatten
 	R = to_serial(NO_CH=1, BW_IN=Precision*Cin, BW_OUT=Precision*D_IN_SIZE)
 
-	R += dense_layer_fp(INPUT_SIZE=D_IN_SIZE, NUM_CYC=D_CYC, BW_IN=Precision, BW_OUT=Precision, BW_W=D_BW_W, R_SHIFT=D_SHIFT, USE_UNSIGNED_DATA=0, OUTPUT_SIZE=Cout)
+	R += dense_layer_fp(INPUT_SIZE=D_IN_SIZE, NUM_CYC=D_CYC, BW_IN=Precision, 
+						BW_OUT=Precision, BW_W=D_BW_W, R_SHIFT=D_SHIFT, 
+						USE_UNSIGNED_DATA=0, OUTPUT_SIZE=Cout)
+	
+	mem_cost_temp = Cout * mem_cost(D_CYC, D_IN_SIZE * D_BW_W)
+	R += mem_cost_temp
 
 	if bn_en:
 		R += bn(NO_CH=Cout, BW_IN=Precision, BW_A=BW_A, BW_B=BW_B, BW_OUT=Precision, R_SHIFT=R_SHIFT, MAXVAL=-1)
@@ -610,21 +631,37 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 ######################################
 # Tests  #############################
 ######################################
+def test_dense_layer_fp():
+	R_max = set_R_max()
+	
+#	R = dense_layer_fp(INPUT_SIZE=2, NUM_CYC=32, BW_IN=16, BW_OUT=23, 
+#			BW_W=2, R_SHIFT=0, OUTPUT_SIZE=100)
+#	logger(R, R_max)
+#	exit()
+
+	R = dense_layer_fp(INPUT_SIZE=1, NUM_CYC=512, BW_IN=16, BW_OUT=27, 
+		BW_W=2, R_SHIFT=0, OUTPUT_SIZE=512)
+	logger(R, R_max)
+	R = dense_layer_fp(INPUT_SIZE=2, NUM_CYC=512, BW_IN=16, BW_OUT=28, 
+		BW_W=2, R_SHIFT=0, OUTPUT_SIZE=512)
+	logger(R, R_max)
+	R = dense_layer_fp(INPUT_SIZE=4, NUM_CYC=256, BW_IN=16, BW_OUT=28, 
+		BW_W=2, R_SHIFT=0, OUTPUT_SIZE=512)
+	logger(R, R_max)
+
+	return 
+
 def test_multiply_accumulate_fp():
 	R_max = set_R_max()
 	# Check: R_SHIFT+BW_OUT < PACC_OUT_BW
-	# for full-precision: "R_SHIFT = BW_W + BW_IN + $clog2(NUM_CYC) + LOG2_NO_VECS - BW_OUT"
-	R = multiply_accumulate_fp (LOG2_NO_VECS=1, BW_IN=16, BW_OUT=16, BW_W=2, 
-		R_SHIFT=8, USE_UNSIGNED_DATA=8, NUM_CYC=32, full_precision=False)
+	# for full-precision: "BW_OUT + R_SHIFT = BW_W + BW_IN + $clog2(NUM_CYC) + LOG2_NO_VECS"
+	R = multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=0, NUM_CYC=32, en=False)
 	logger(R, R_max)
-	R = multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=16, BW_W=2, 
-		R_SHIFT=9, USE_UNSIGNED_DATA=9, NUM_CYC=32, full_precision=False)
+	R = multiply_accumulate_fp (LOG2_NO_VECS=3, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=2, NUM_CYC=64, en=False)
 	logger(R, R_max)
-	R = multiply_accumulate_fp (LOG2_NO_VECS=3, BW_IN=16, BW_OUT=16, BW_W=2, 
-		R_SHIFT=10, USE_UNSIGNED_DATA=10, NUM_CYC=32, full_precision=False)
+	R = multiply_accumulate_fp (LOG2_NO_VECS=4, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=4, NUM_CYC=128, en=False)
 	logger(R, R_max)
-	R = multiply_accumulate_fp (LOG2_NO_VECS=4, BW_IN=16, BW_OUT=16, BW_W=2, 
-		R_SHIFT=11, USE_UNSIGNED_DATA=11, NUM_CYC=32, full_precision=False)
+	R = multiply_accumulate_fp (LOG2_NO_VECS=5, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=6, NUM_CYC=256, en=False)
 	logger(R, R_max)
 	return 
 
