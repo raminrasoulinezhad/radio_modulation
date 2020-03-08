@@ -25,8 +25,107 @@ def multiplier_cost (a, b, en=False):
 
 	return np.array([LUT, 0, 0, DSP])
 
-def mem_cost(rows, cols):
+def ROM_cost(rows, cols):
 	#print("mem cost. rows: %d, cols: %d" % (rows, cols))
+	# [LUT, FF, BRAM, DSP]
+
+	if (rows >= 512):
+		if (cols == 1):
+			if rows <= (2**13):
+				return np.array([0, 0, 0.5, 0])
+			else:
+				BRAM_rows = np.ceil(rows/(2**14))
+				return np.array([0, 0, BRAM_rows, 0])
+
+		elif (cols == 2):
+			if rows <= (2**12):
+				return np.array([0, 0, 0.5, 0])
+			else:
+				BRAM_rows = np.ceil(rows/(2**13))
+				return np.array([0, 0, BRAM_rows, 0])
+
+		elif ((cols > 2) & (cols <= 4)) :
+			if rows <= (2**11):
+				return np.array([0, 0, 0.5, 0])
+			else:
+				BRAM_rows = np.ceil(rows/(2**12))
+				return np.array([0, 0, BRAM_rows, 0])
+		
+		elif ((cols > 4) & (cols <= 9)) :
+			if rows <= (2**10):
+				return np.array([0, 0, 0.5, 0])
+			else:
+				BRAM_rows = np.ceil(rows/(2**11))
+				return np.array([0, 0, BRAM_rows, 0])
+
+		elif ((cols > 9) & (cols <= 18)) :
+			if rows <= (2**9):
+				return np.array([0, 0, 0.5, 0])
+			else:
+				BRAM_rows = np.ceil(rows/(2**10))
+				return np.array([0, 0, BRAM_rows, 0])
+
+		else:
+			# It is not accurate but it is a good estimation
+			# A comprehensive serarch is required. 
+			# It is a covering problem with unites such as 1K18,2K9,4K4,...
+			BRAM_rows = np.ceil(rows/(2**10))
+			BRAM_cols = np.ceil(cols/18)
+			return np.array([0, 0, BRAM_rows * BRAM_cols, 0])
+
+	elif ((rows>128) & (rows<=256)):	
+		BRAM_cols = np.ceil(cols/72)
+		if cols >= 36: # 36 is just a picked number
+			return np.array([0, 0, BRAM_cols, 0])
+		else:
+			return np.array([cols * 4, 0, 0, 0])
+
+	elif ((rows>64) & (rows<=128)):	
+		return np.array([cols * 2, 0, 0, 0])
+
+	elif (rows<=64):	
+		return np.array([cols, 0, 0, 0])
+
+	elif (rows<=32):	
+		return np.array([cols * 0.5, 0, 0, 0])
+
+	"""
+	if rows > 16384:
+
+	elif ((rows>8192) & (rows<=16384)):
+			return np.array([0, 0, 1 * cols, 0])
+
+	elif ((rows>4096) & (rows<=8192)):
+		BRAM_cols = np.ceil(cols/2)
+		if (cols <= 1):
+			return np.array([0, 0, 0.5 * BRAM_cols, 0])
+		else:
+			return np.array([0, 0, 1 * BRAM_cols, 0])
+
+	elif ((rows>2048) & (rows<=4096)):
+		BRAM_cols = np.ceil(cols/4)
+		if (cols <= 2):
+			return np.array([0, 0, 0.5 * BRAM_cols, 0])
+		else:
+			return np.array([0, 0, 1 * BRAM_cols, 0])
+
+	elif ((rows>1024) & (rows<=2048)):
+		BRAM_cols = np.ceil(cols/9)
+		if (cols <= 4):
+			return np.array([0, 0, 0.5 * BRAM_cols, 0])
+		else:
+			return np.array([0, 0, 1 * BRAM_cols, 0])
+
+	elif ((rows>512) & (rows<=1024)):
+		BRAM_cols = np.ceil(cols/18)
+		if (cols <= 9):
+			return np.array([0, 0, 0.5 * BRAM_cols, 0])
+		else:
+			return np.array([0, 0, 1 * BRAM_cols, 0])
+	"""
+
+
+	"""
 	if rows == 512:
 		return np.array([9 * cols, 0, 0, 0])
 	elif rows == 256:
@@ -39,6 +138,7 @@ def mem_cost(rows, cols):
 		return np.array([int(0.5 * cols), 0, 0, 0])
 	else:
 		raise Exception ("mem cost is not supporting rows: %d, cols: %d" % (rows, cols) )
+	"""
 
 def width_divider(in_w, times):
 	for i in range(times):
@@ -315,6 +415,7 @@ def dense_layer_fp(INPUT_SIZE=4, NUM_CYC=512, BW_IN=16, BW_OUT=16, BW_W=16,
 	FF += LOG2_CYC				# cntr
 	FF += VLD_SR_LEN			# vld_sr
 
+	######################## Problem
 	BRAM = 0 # OUTPUT_SIZE/2
 	DSP = 0
 
@@ -588,7 +689,8 @@ def FCLayer(Cin=64, Cout=128, Precision=16, D_IN_SIZE=1, D_CYC=512, D_BW_W=2, D_
 						BW_OUT=Precision, BW_W=D_BW_W, R_SHIFT=D_SHIFT, 
 						USE_UNSIGNED_DATA=0, OUTPUT_SIZE=Cout)
 	
-	mem_cost_temp = Cout * mem_cost(D_CYC, D_IN_SIZE * D_BW_W)
+	mem_cost_temp = Cout * ROM_cost(D_CYC, D_IN_SIZE * D_BW_W)
+
 	R += mem_cost_temp
 
 	if bn_en:
