@@ -689,9 +689,8 @@ def FCLayer(Cin=64, Cout=128, Precision=16, D_IN_SIZE=1, D_CYC=512, D_BW_W=2, D_
 						BW_OUT=Precision, BW_W=D_BW_W, R_SHIFT=D_SHIFT, 
 						USE_UNSIGNED_DATA=0, OUTPUT_SIZE=Cout)
 	
-	mem_cost_temp = Cout * ROM_cost(D_CYC, D_IN_SIZE * D_BW_W)
-
-	R += mem_cost_temp
+	# weights
+	R += Cout * ROM_cost(D_CYC, D_IN_SIZE * D_BW_W)
 
 	if bn_en:
 		R += bn(NO_CH=Cout, BW_IN=Precision, BW_A=BW_A, BW_B=BW_B, BW_OUT=Precision, R_SHIFT=R_SHIFT, MAXVAL=-1)
@@ -721,144 +720,11 @@ def tw_vgg_2iq(act_in=16, L2_IMG=10, Adder_W=[16,16,8,4,2,1,1], Cout=[64]*7+[512
 	R = reset_R()
 	for i in range(n_conv):
 		Deep = deep_factor(i, n_conv)
-		print("Conv %d:   " % (i), WINDOW[i], Cin[i], Cout[i], act_in, Adder_W[i], THROUGHPUT[i], L2_IMG-i, Deep, BN_BW_A[i], BN_BW_B[i], BN_R_SHIFT[i])
+		print("Conv %2d:\t" % (i), WINDOW[i], Cin[i], Cout[i], act_in, Adder_W[i], THROUGHPUT[i], L2_IMG-i, Deep, BN_BW_A[i], BN_BW_B[i], BN_R_SHIFT[i])
 		R += ConvLayer(WINDOW=WINDOW[i], Cin=Cin[i], Cout=Cout[i], act_in=act_in, Adder_W=Adder_W[i], THROUGHPUT=THROUGHPUT[i], L2_IMG=L2_IMG-i, Deep=Deep, BN_BW_A=BN_BW_A[i], BN_BW_B=BN_BW_B[i], BN_R_SHIFT=BN_R_SHIFT[i])
 	
 	for i in range(n_fc):
-		print ("FC %d:   " % (i), Cin[n_conv+i], Cout[n_conv+i], act_in, (i != (n_fc-1)), BN_BW_A[n_conv+i], BN_BW_B[n_conv+i], BN_R_SHIFT[n_conv+i])
+		print ("FC %2d:\t" % (i), Cin[n_conv+i], Cout[n_conv+i], act_in, (i != (n_fc-1)), BN_BW_A[n_conv+i], BN_BW_B[n_conv+i], BN_R_SHIFT[n_conv+i])
 		R += FCLayer(Cin=Cin[n_conv+i], Cout=Cout[n_conv+i], Precision=act_in, D_BW_W=D_BW_W[i], D_SHIFT=D_SHIFT[i], bn_en=(i != (n_fc-1)), BW_A=BN_BW_A[n_conv+i], BW_B=BN_BW_B[n_conv+i], R_SHIFT=BN_R_SHIFT[n_conv+i])
 
 	return R
-
-######################################
-# Tests  #############################
-######################################
-def test_dense_layer_fp():
-	R_max = set_R_max()
-	
-#	R = dense_layer_fp(INPUT_SIZE=2, NUM_CYC=32, BW_IN=16, BW_OUT=23, 
-#			BW_W=2, R_SHIFT=0, OUTPUT_SIZE=100)
-#	logger(R, R_max)
-#	exit()
-
-	R = dense_layer_fp(INPUT_SIZE=1, NUM_CYC=512, BW_IN=16, BW_OUT=27, 
-		BW_W=2, R_SHIFT=0, OUTPUT_SIZE=512)
-	logger(R, R_max)
-	R = dense_layer_fp(INPUT_SIZE=2, NUM_CYC=512, BW_IN=16, BW_OUT=28, 
-		BW_W=2, R_SHIFT=0, OUTPUT_SIZE=512)
-	logger(R, R_max)
-	R = dense_layer_fp(INPUT_SIZE=4, NUM_CYC=256, BW_IN=16, BW_OUT=28, 
-		BW_W=2, R_SHIFT=0, OUTPUT_SIZE=512)
-	logger(R, R_max)
-
-	return 
-
-def test_multiply_accumulate_fp():
-	R_max = set_R_max()
-	# Check: R_SHIFT+BW_OUT < PACC_OUT_BW
-	# for full-precision: "BW_OUT + R_SHIFT = BW_W + BW_IN + $clog2(NUM_CYC) + LOG2_NO_VECS"
-	R = multiply_accumulate_fp (LOG2_NO_VECS=2, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=0, NUM_CYC=32, en=False)
-	logger(R, R_max)
-	R = multiply_accumulate_fp (LOG2_NO_VECS=3, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=2, NUM_CYC=64, en=False)
-	logger(R, R_max)
-	R = multiply_accumulate_fp (LOG2_NO_VECS=4, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=4, NUM_CYC=128, en=False)
-	logger(R, R_max)
-	R = multiply_accumulate_fp (LOG2_NO_VECS=5, BW_IN=16, BW_OUT=25, BW_W=2, R_SHIFT=6, NUM_CYC=256, en=False)
-	logger(R, R_max)
-	return 
-
-def test_pipelined_accumulator():
-	R_max = set_R_max()
-	R = pipelined_accumulator (IN_BITWIDTH=8, OUT_BITWIDTH=8, LOG2_NO_IN=1)
-	logger(R, R_max)
-	R = pipelined_accumulator (IN_BITWIDTH=6, OUT_BITWIDTH=9, LOG2_NO_IN=3)
-	logger(R, R_max)
-	R = pipelined_accumulator (IN_BITWIDTH=12, OUT_BITWIDTH=12, LOG2_NO_IN=2)
-	logger(R, R_max)
-	R = pipelined_accumulator (IN_BITWIDTH=10, OUT_BITWIDTH=11, LOG2_NO_IN=4)
-	logger(R, R_max)
-	return 
-
-def test_popcount_accumulate():
-	R_max = set_R_max()
-	R = popcount_accumulate (NO_CH=512, BW_IN=8, BW_OUT=16, CYC_ACC=4, RSHIFT_CYC=1)
-	logger(R, R_max)
-	R = popcount_accumulate (NO_CH=512, BW_IN=12, BW_OUT=16, CYC_ACC=4, RSHIFT_CYC=1)
-	logger(R, R_max)
-	R = popcount_accumulate (NO_CH=512, BW_IN=12, BW_OUT=8, CYC_ACC=4, RSHIFT_CYC=1)
-	logger(R, R_max)
-	R = popcount_accumulate (NO_CH=512, BW_IN=12, BW_OUT=16, CYC_ACC=8, RSHIFT_CYC=1)
-	logger(R, R_max)
-	return 
-
-def test_bn():
-	R_max = set_R_max()
-	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=4095)
-	logger(R, R_max)
-	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=60)
-	logger(R, R_max)
-	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=64)
-	logger(R, R_max)
-	R = bn(NO_CH=10, BW_IN=12, BW_A=12, BW_B=12, BW_OUT=12, R_SHIFT=6, MAXVAL=32)
-	logger(R, R_max)
-	return 
-
-def test_from_serial():
-	R_max = set_R_max()
-	R = from_serial(NO_CH=64, BW_IN=4, BW_OUT=8)
-	logger(R, R_max)
-	R = from_serial(NO_CH=256, BW_IN=2, BW_OUT=8)
-	logger(R, R_max)
-	R = from_serial(NO_CH=512, BW_IN=4, BW_OUT=32)
-	logger(R, R_max)
-	R = from_serial(NO_CH=1024, BW_IN=2, BW_OUT=16)
-	logger(R, R_max)
-	return 
-
-def test_maxpool_flex():
-	R_max = set_R_max()
-	R = maxpool_flex(NO_CH=10, BW_IN=12, SER_BW=4)
-	logger(R, R_max)
-	R = maxpool_flex(NO_CH=20, BW_IN=12, SER_BW=4)
-	logger(R, R_max)
-	R = maxpool_flex(NO_CH=10, BW_IN=64, SER_BW=4)
-	logger(R, R_max)
-	R = maxpool_flex(NO_CH=10, BW_IN=12, SER_BW=12)
-	logger(R, R_max)
-	return 
-
-def test_to_serial():
-	R_max = set_R_max()
-	R = to_serial(NO_CH=32, BW_IN=12, BW_OUT=2)
-	logger(R, R_max)
-	R = to_serial(NO_CH=128, BW_IN=12, BW_OUT=3)
-	logger(R, R_max)
-	R = to_serial(NO_CH=8, BW_IN=12, BW_OUT=4)
-	logger(R, R_max)
-	R = to_serial(NO_CH=32, BW_IN=12, BW_OUT=6)
-	logger(R, R_max)
-	return 
-
-def test_windower_serial_flex():
-	R_max = set_R_max()
-	R = windower_serial_flex(NO_CH=32, LOG2_IMG_SIZE=12, WINDOW=3, SER_CYC=16)
-	logger(R, R_max)
-	R = windower_serial_flex(NO_CH=8, LOG2_IMG_SIZE=10, WINDOW=5, SER_CYC=8)
-	logger(R, R_max)
-	R = windower_serial_flex(NO_CH=64, LOG2_IMG_SIZE=8, WINDOW=7, SER_CYC=6)
-	logger(R, R_max)
-	R = windower_serial_flex(NO_CH=128, LOG2_IMG_SIZE=6, WINDOW=9, SER_CYC=4)
-	logger(R, R_max)
-	return 
-
-def test_windower_flex():
-	R_max = set_R_max()
-	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=1, PADDDING=True)
-	logger(R, R_max)
-	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=2, PADDDING=True)
-	logger(R, R_max)
-	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=2, PADDDING=True)
-	logger(R, R_max)
-	R = windower_flex(WINDOW=3, NO_CH=128, LOG2_IMG_SIZE=10, THROUGHPUT=2, PADDDING=True)
-	logger(R, R_max)
-	return 

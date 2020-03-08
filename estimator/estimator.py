@@ -13,6 +13,8 @@ def get_args():
 if __name__ == "__main__":
 	args = get_args()
 
+	#test_bn()
+
 	# to estimate the f64 model
 	R_max = set_R_max() 
 	R = tw_vgg_2iq()

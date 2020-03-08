@@ -169,12 +169,12 @@ windower_ramin:
 | from_serial             | **OK**   | **OK**        |                        |
 | bn_relu_fp              | **OK**   | **OK**        |                        |
 | bn_relu_fp_accurate     | **OK**   | **OK**        |                        |
-| :---                    | :---     | :---          |                        |
 | dense_layer_fp          | ****     | **OK**        |                        |
 | multiply_accumulate_fp  | ****     | **OK**        | R_SHIFT in full precision mode |
 | pipelined_accumulator   | ****     | **OK**        |                        |
 | popcount_accumulate     | ****     | **Semi-OK**   |                        |
-
+| full system	          | ****     | **Semi-OK**   | LUT/DSP/BRAM are OK - Reg is not OK (+15%) |
+| :---                    | :---     | :---          |                        |
 
 
 # f64 is not working 
